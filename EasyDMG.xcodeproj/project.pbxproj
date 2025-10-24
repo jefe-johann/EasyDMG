@@ -10,9 +10,22 @@
 		1F889A532EAC112E0065ECE5 /* EasyDMG.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EasyDMG.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1F889A622EAC14860065ECE5 /* Exceptions for "EasyDMG" folder in "EasyDMG" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1F889A522EAC112E0065ECE5 /* EasyDMG */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1F889A552EAC112E0065ECE5 /* EasyDMG */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1F889A622EAC14860065ECE5 /* Exceptions for "EasyDMG" folder in "EasyDMG" target */,
+			);
 			path = EasyDMG;
 			sourceTree = "<group>";
 		};
@@ -259,6 +272,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EasyDMG/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -291,6 +305,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EasyDMG/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

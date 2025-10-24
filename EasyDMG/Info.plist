@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Document Types - Register as DMG handler -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Disk Image</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.disk-image</string>
+			</array>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>dmg</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- App Icon -->
+	<key>CFBundleIconFile</key>
+	<string>wizardhamster</string>
+
+	<!-- App Category -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+
+	<!-- Privacy - Desktop Folder Access (required for App Store) -->
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>EasyDMG needs access to install applications to your Applications folder.</string>
+
+	<!-- Optional: Run as background app with no dock icon -->
+	<!-- Uncomment the lines below to make it background-only like the current Platypus version -->
+	<!-- <key>LSUIElement</key>
+	<true/> -->
+</dict>
+</plist>
