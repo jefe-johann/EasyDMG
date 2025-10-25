@@ -38,11 +38,12 @@ class DMGProcessor: ObservableObject {
         }
 
         // Check for license agreement in DMG
-        if await hasLicenseAgreement(dmgPath: url.path) {
-            print("DMG has license agreement - opening for manual installation")
-            await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
-            return
-        }
+        // TODO: Fix license detection - currently giving false positives without sandbox
+        // if await hasLicenseAgreement(dmgPath: url.path) {
+        //     print("DMG has license agreement - opening for manual installation")
+        //     await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
+        //     return
+        // }
 
         // Mount the DMG
         guard let mountPoint = await mountDMG(at: url.path) else {

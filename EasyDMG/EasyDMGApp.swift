@@ -6,10 +6,13 @@
 //
 
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 @main
 struct EasyDMGApp: App {
     @StateObject private var dmgProcessor = DMGProcessor()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -20,7 +23,14 @@ struct EasyDMGApp: App {
                     handleOpenedFile(url)
                 }
         }
-        .handlesExternalEvents(matching: [])
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("Open DMG...") {
+                    selectDMGFile()
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
+        }
     }
 
     private func handleOpenedFile(_ url: URL) {
@@ -37,4 +47,33 @@ struct EasyDMGApp: App {
             await dmgProcessor.processDMG(at: url)
         }
     }
+
+    private func selectDMGFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.init(filenameExtension: "dmg")!]
+        panel.message = "Select a DMG file to install"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            handleOpenedFile(url)
+        }
+    }
+}
+
+// AppDelegate to handle file opening events
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        print("AppDelegate received files: \(urls)")
+        for url in urls {
+            if url.pathExtension.lowercased() == "dmg" {
+                NotificationCenter.default.post(name: .openDMGFile, object: url)
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    static let openDMGFile = Notification.Name("openDMGFile")
 }

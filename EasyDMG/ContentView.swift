@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject var dmgProcessor: DMGProcessor
@@ -28,6 +30,11 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
 
+            Button("Select DMG File...") {
+                selectDMGFile()
+            }
+            .buttonStyle(.borderedProminent)
+
             if dmgProcessor.isProcessing {
                 ProgressView()
                     .scaleEffect(0.8)
@@ -39,6 +46,21 @@ struct ContentView: View {
         }
         .padding()
         .frame(minWidth: 400, minHeight: 300)
+    }
+
+    private func selectDMGFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.init(filenameExtension: "dmg")!]
+        panel.message = "Select a DMG file to install"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                await dmgProcessor.processDMG(at: url)
+            }
+        }
     }
 }
 
