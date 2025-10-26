@@ -14,9 +14,9 @@ import Combine
 class DMGProcessor: ObservableObject {
     @Published var isProcessing = false
 
-    private func showProgress(_ message: String) {
-        print("📝 \(message)")
-        ProgressWindowController.shared.update(message: message)
+    private func showProgress(_ message: String, progress: Double) {
+        print("📝 \(message) (\(Int(progress * 100))%)")
+        ProgressWindowController.shared.update(message: message, progress: progress)
     }
 
     // Process a DMG file (main entry point)
@@ -33,7 +33,7 @@ class DMGProcessor: ObservableObject {
 
         // Show progress window
         print("🔵 Showing progress window...")
-        ProgressWindowController.shared.show(message: "Preparing...")
+        ProgressWindowController.shared.show(message: "Preparing...", progress: 0.0)
 
         // Validate the DMG file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -48,15 +48,15 @@ class DMGProcessor: ObservableObject {
         //     return
         // }
 
-        // Mount the DMG
-        showProgress("Mounting disk image...")
+        // Mount the DMG (Step 1: 0% → 20%)
+        showProgress("Mounting disk image...", progress: 0.0)
         guard let mountPoint = await mountDMG(at: url.path) else {
             await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
             return
         }
 
-        // Find .app files in the mounted DMG
-        showProgress("Scanning for apps...")
+        // Find .app files in the mounted DMG (Step 2 starts: 20%)
+        showProgress("Scanning for apps...", progress: 0.2)
         let appFiles = findAppFiles(in: mountPoint)
 
         // Handle different scenarios
@@ -205,7 +205,7 @@ class DMGProcessor: ObservableObject {
             }
 
             // User chose to replace - remove existing app
-            showProgress("Removing old version...")
+            showProgress("Removing old version...", progress: 0.2)
             do {
                 try FileManager.default.removeItem(atPath: destinationPath)
             } catch {
@@ -216,8 +216,8 @@ class DMGProcessor: ObservableObject {
             }
         }
 
-        // Copy app to /Applications
-        showProgress("Installing app...")
+        // Copy app to /Applications (Step 2: 20% → 40%)
+        showProgress("Installing to Applications...", progress: 0.2)
         do {
             try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
         } catch {
@@ -227,15 +227,25 @@ class DMGProcessor: ObservableObject {
             return
         }
 
-        // Cleanup
-        showProgress("Cleaning up...")
-        await unmountAndCleanup(mountPoint: mountPoint, dmgPath: dmgPath)
+        // Unmount DMG (Step 3: 40% → 60%)
+        showProgress("Unmounting disk image...", progress: 0.4)
+        await unmountDMG(at: mountPoint)
 
-        // Reveal in Finder
+        // Move to Trash (Step 4: 60% → 80%)
+        showProgress("Moving disk image to trash...", progress: 0.6)
+        let dmgURL = URL(fileURLWithPath: dmgPath)
+        do {
+            try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
+        } catch {
+            print("Warning: Failed to move DMG to trash: \(error)")
+        }
+
+        // Reveal in Finder (Step 5: 80% → 100%)
+        showProgress("Opening in Finder...", progress: 0.8)
         revealInFinder(path: destinationPath)
 
         // Show completion message briefly
-        showProgress("Installation complete!")
+        showProgress("Installation complete!", progress: 1.0)
         try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
 
         // Hide the progress window
@@ -340,7 +350,7 @@ class DMGProcessor: ObservableObject {
     // Handle errors
     private func handleError(_ message: String) async {
         print("Error: \(message)")
-        showProgress("Error: \(message)")
+        showProgress("Error: \(message)", progress: 0.0)
 
         // Keep error visible for 3 seconds
         try? await Task.sleep(nanoseconds: 3_000_000_000)
