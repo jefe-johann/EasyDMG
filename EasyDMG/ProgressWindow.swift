@@ -7,10 +7,19 @@
 
 import SwiftUI
 import AppKit
+import Combine
+
+// Observable state for progress updates
+@MainActor
+class ProgressState: ObservableObject {
+    @Published var message: String = "Processing..."
+    @Published var progress: Double = 0.0
+}
 
 @MainActor
 class ProgressWindowController: NSWindowController {
     static let shared = ProgressWindowController()
+    private let progressState = ProgressState()
 
     private init() {
         // Create a compact notification-style window
@@ -29,8 +38,9 @@ class ProgressWindowController: NSWindowController {
 
         super.init(window: window)
 
-        // Set up the SwiftUI content view
+        // Set up the SwiftUI content view with observable state
         let contentView = InstallProgressView()
+            .environmentObject(progressState)
         window.contentView = NSHostingView(rootView: contentView)
 
         // Position in top-right corner (notification area)
@@ -56,51 +66,40 @@ class ProgressWindowController: NSWindowController {
     }
 
     func show(message: String, progress: Double = 0.0) {
-        print("🪟 ProgressWindow.show() called with message: '\(message)', progress: \(progress)")
         guard let window = window else {
             print("❌ Window is nil!")
             return
         }
 
-        // Update the message and progress
-        if let hostingView = window.contentView as? NSHostingView<InstallProgressView> {
-            hostingView.rootView = InstallProgressView(message: message, progress: progress)
-            print("🪟 Updated hosting view with message and progress")
-        }
+        // Update the observable state (SwiftUI will automatically update the view)
+        progressState.message = message
+        progressState.progress = progress
 
         // Position in top-right corner and show the window
-        print("🪟 Positioning and showing window...")
         positionInTopRight()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        print("🪟 Window should now be visible!")
     }
 
     func update(message: String, progress: Double) {
-        print("🪟 ProgressWindow.update() called with message: '\(message)', progress: \(progress)")
-        guard let window = window else {
+        guard window != nil else {
             print("❌ Window is nil!")
             return
         }
 
-        // Update the message and progress
-        if let hostingView = window.contentView as? NSHostingView<InstallProgressView> {
-            hostingView.rootView = InstallProgressView(message: message, progress: progress)
-            print("🪟 Updated message and progress")
-        }
+        // Update the observable state (SwiftUI will automatically update the view)
+        progressState.message = message
+        progressState.progress = progress
     }
 
     func hide() {
-        print("🪟 ProgressWindow.hide() called")
         window?.orderOut(nil)
-        print("🪟 Window hidden")
     }
 }
 
 // SwiftUI view for the progress window
 struct InstallProgressView: View {
-    var message: String = "Processing..."
-    var progress: Double = 0.0
+    @EnvironmentObject var state: ProgressState
 
     var body: some View {
         HStack(spacing: 12) {
@@ -118,20 +117,68 @@ struct InstallProgressView: View {
 
             // Text and progress bar
             VStack(alignment: .leading, spacing: 6) {
-                Text(message)
+                Text(state.message)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
 
-                SwiftUI.ProgressView(value: progress, total: 1.0)
-                    .progressViewStyle(.linear)
-                    .tint(Color(red: 112/255, green: 113/255, blue: 112/255))
+                // Custom progress bar with manual drawing (SwiftUI's .tint() is unreliable on macOS)
+                SwiftUI.ProgressView(value: state.progress, total: 1.0)
+                    .progressViewStyle(CustomProgressBarStyle())
+                    .frame(height: 6)
             }
         }
-        .tint(Color(red: 112/255, green: 113/255, blue: 112/255))
-        .environment(\.controlActiveState, .key)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(VisualEffectView())
+    }
+}
+
+// Custom progress bar style with manual drawing (SwiftUI's .tint() is broken on macOS)
+struct CustomProgressBarStyle: ProgressViewStyle {
+    var fillColor: Color = Color(hex: "B0DA7F")
+    var backgroundColor: Color = Color.white.opacity(0.25)
+    var height: CGFloat = 6
+
+    func makeBody(configuration: Configuration) -> some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                // Background track
+                Capsule()
+                    .fill(backgroundColor)
+                    .frame(height: height)
+
+                // Filled portion
+                Capsule()
+                    .fill(fillColor)
+                    .frame(
+                        width: geometry.size.width * CGFloat(configuration.fractionCompleted ?? 0),
+                        height: height
+                    )
+            }
+        }
+    }
+}
+
+// Hex color extension for convenience
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r, g, b: UInt64
+        switch hex.count {
+        case 6: // RGB (24-bit)
+            (r, g, b) = ((int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        default:
+            (r, g, b) = (1, 1, 1)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: 1
+        )
     }
 }
 
