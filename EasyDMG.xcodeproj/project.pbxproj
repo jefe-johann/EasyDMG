@@ -68,6 +68,7 @@
 				1F889A4F2EAC112E0065ECE5 /* Sources */,
 				1F889A502EAC112E0065ECE5 /* Frameworks */,
 				1F889A512EAC112E0065ECE5 /* Resources */,
+				1F889A6D2EAD7E480065ECE5 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -126,6 +127,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1F889A6D2EAD7E480065ECE5 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nset -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nDST=\"/Applications/${FULL_PRODUCT_NAME}\"\n\n# Only copy if missing or newer\nif [ ! -d \"$DST\" ] || [ \"$SRC\" -nt \"$DST\" ]; then\n  # Remove old, then copy preserving bundle metadata\n  rm -rf \"$DST\"\n  /usr/bin/ditto \"$SRC\" \"$DST\"\n\n  # Optional: reveal the installed app after copy\n  # /usr/bin/open -R \"$DST\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1F889A4F2EAC112E0065ECE5 /* Sources */ = {

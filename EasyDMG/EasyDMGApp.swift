@@ -11,69 +11,58 @@ import UniformTypeIdentifiers
 
 @main
 struct EasyDMGApp: App {
-    @StateObject private var dmgProcessor = DMGProcessor()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
+        // Hidden window group for background-only app
+        // This allows file associations to work properly
         WindowGroup {
-            ContentView()
-                .environmentObject(dmgProcessor)
-                .onOpenURL { url in
-                    // Handle DMG files opened via double-click or drag-drop
-                    handleOpenedFile(url)
-                }
+            EmptyView()
+                .frame(width: 0, height: 0)
         }
         .commands {
-            CommandGroup(replacing: .newItem) {
-                Button("Open DMG...") {
-                    selectDMGFile()
-                }
-                .keyboardShortcut("o", modifiers: .command)
-            }
+            // Remove all menu commands for cleaner background operation
+            CommandGroup(replacing: .newItem) { }
         }
-    }
-
-    private func handleOpenedFile(_ url: URL) {
-        // Verify it's a DMG file
-        guard url.pathExtension.lowercased() == "dmg" else {
-            print("Ignoring non-DMG file: \(url.path)")
-            return
-        }
-
-        print("Opening DMG file: \(url.path)")
-
-        // Process the DMG file
-        Task {
-            await dmgProcessor.processDMG(at: url)
-        }
-    }
-
-    private func selectDMGFile() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.init(filenameExtension: "dmg")!]
-        panel.message = "Select a DMG file to install"
-
-        if panel.runModal() == .OK, let url = panel.url {
-            handleOpenedFile(url)
-        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 0, height: 0)
     }
 }
 
 // AppDelegate to handle file opening events
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private let dmgProcessor = DMGProcessor()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        print("✅ EasyDMG launched in background mode")
+
+        // Hide the empty window immediately
+        NSApp.windows.first?.orderOut(nil)
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
-        print("AppDelegate received files: \(urls)")
+        print("✅ application(_:open:) called with \(urls.count) file(s): \(urls)")
+
         for url in urls {
+            print("✅ Checking file: \(url.path)")
             if url.pathExtension.lowercased() == "dmg" {
-                NotificationCenter.default.post(name: .openDMGFile, object: url)
+                print("✅ Processing DMG file: \(url.lastPathComponent)")
+                Task { @MainActor in
+                    await dmgProcessor.processDMG(at: url)
+                }
+            } else {
+                print("⚠️ Not a DMG file, ignoring: \(url.path)")
             }
         }
     }
-}
 
-extension Notification.Name {
-    static let openDMGFile = Notification.Name("openDMGFile")
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Prevent quit only while actively processing
+        if dmgProcessor.isProcessing {
+            print("⚠️ Still processing, preventing quit")
+            return .terminateCancel
+        }
+        print("✅ Processing complete, allowing termination")
+        return .terminateNow
+    }
 }

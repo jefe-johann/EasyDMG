@@ -13,23 +13,27 @@ import Combine
 @MainActor
 class DMGProcessor: ObservableObject {
     @Published var isProcessing = false
-    @Published var statusMessage = ""
+
+    private func showProgress(_ message: String) {
+        print("📝 \(message)")
+        ProgressWindowController.shared.update(message: message)
+    }
 
     // Process a DMG file (main entry point)
     func processDMG(at url: URL) async {
+        print("🔵 DMGProcessor.processDMG called with: \(url.path)")
+
         guard !isProcessing else {
-            print("Already processing a DMG file")
+            print("⚠️ Already processing a DMG file")
             return
         }
 
         isProcessing = true
-        statusMessage = "Processing DMG files..."
+        print("🔵 Setting isProcessing = true")
 
-        // Show startup notification
-        NotificationManager.shared.showNotification(
-            title: "EasyDMG",
-            message: "Processing DMG files..."
-        )
+        // Show progress window
+        print("🔵 Showing progress window...")
+        ProgressWindowController.shared.show(message: "Preparing...")
 
         // Validate the DMG file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -40,24 +44,25 @@ class DMGProcessor: ObservableObject {
         // Check for license agreement in DMG
         // TODO: Fix license detection - currently giving false positives without sandbox
         // if await hasLicenseAgreement(dmgPath: url.path) {
-        //     print("DMG has license agreement - opening for manual installation")
         //     await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
         //     return
         // }
 
         // Mount the DMG
+        showProgress("Mounting disk image...")
         guard let mountPoint = await mountDMG(at: url.path) else {
             await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
             return
         }
 
         // Find .app files in the mounted DMG
+        showProgress("Scanning for apps...")
         let appFiles = findAppFiles(in: mountPoint)
 
         // Handle different scenarios
         switch appFiles.count {
         case 0:
-            print("No .app found in DMG - opening for manual handling")
+            print("No .app files found")
             await openForManualInstallation(mountPoint: mountPoint)
             return
 
@@ -67,8 +72,7 @@ class DMGProcessor: ObservableObject {
             await installApp(from: appPath, mountPoint: mountPoint, dmgPath: url.path)
 
         default:
-            // Multiple apps found - manual handling
-            print("Multiple .app files found - opening for manual handling")
+            print("Multiple .app files found (\(appFiles.count))")
             await openForManualInstallation(mountPoint: mountPoint)
             return
         }
@@ -184,66 +188,63 @@ class DMGProcessor: ObservableObject {
 
         // Check if app already exists
         if FileManager.default.fileExists(atPath: destinationPath) {
-            print("App '\(appName)' already exists in Applications")
-
             // Show Skip/Replace dialog
             let shouldReplace = await showSkipReplaceDialog(appName: appName)
 
             if !shouldReplace {
                 // User chose to skip
-                NotificationManager.shared.showNotification(
-                    title: "EasyDMG",
-                    message: "Skipped installing \(appName)"
-                )
+                print("Installation cancelled by user")
                 await unmountAndCleanup(mountPoint: mountPoint, dmgPath: dmgPath)
+                ProgressWindowController.shared.hide()
                 isProcessing = false
+
+                // Quit after user skips
+                print("✅ User skipped installation, quitting app")
+                NSApp.terminate(nil)
                 return
             }
 
             // User chose to replace - remove existing app
+            showProgress("Removing old version...")
             do {
                 try FileManager.default.removeItem(atPath: destinationPath)
             } catch {
-                print("Error removing existing app: \(error)")
-                await handleError("Failed to remove existing app")
+                await handleError("Failed to remove old version")
                 await unmountDMG(at: mountPoint)
                 isProcessing = false
                 return
             }
         }
 
-        // Brief pause for UX pacing
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-
         // Copy app to /Applications
-        print("Installing \(appName) to Applications folder...")
+        showProgress("Installing app...")
         do {
             try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
         } catch {
-            print("Error copying app: \(error)")
-            await handleError("Failed to install app: \(error.localizedDescription)")
+            await handleError("Installation failed")
             await unmountDMG(at: mountPoint)
             isProcessing = false
             return
         }
 
-        // Brief pause before cleanup
-        try? await Task.sleep(nanoseconds: 500_000_000)
-
-        // Success!
+        // Cleanup
+        showProgress("Cleaning up...")
         await unmountAndCleanup(mountPoint: mountPoint, dmgPath: dmgPath)
-
-        // Show success notification
-        let message = FileManager.default.fileExists(atPath: destinationPath) ? "Replaced \(appName)" : "Installed \(appName)"
-        NotificationManager.shared.showNotification(
-            title: "EasyDMG",
-            message: message
-        )
 
         // Reveal in Finder
         revealInFinder(path: destinationPath)
 
+        // Show completion message briefly
+        showProgress("Installation complete!")
+        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+
+        // Hide the progress window
+        ProgressWindowController.shared.hide()
         isProcessing = false
+
+        // Quit the app after processing is complete
+        print("✅ Processing complete, quitting app")
+        NSApp.terminate(nil)
     }
 
     // Show Skip/Replace dialog
@@ -311,20 +312,24 @@ class DMGProcessor: ObservableObject {
 
     // Open for manual installation (mount point)
     private func openForManualInstallation(mountPoint: String) async {
-        NotificationManager.shared.showNotification(
-            title: "EasyDMG",
-            message: "DMG requires manual installation"
-        )
         NSWorkspace.shared.open(URL(fileURLWithPath: mountPoint))
+        ProgressWindowController.shared.hide()
+        isProcessing = false
+
+        // Quit after opening for manual install
+        print("✅ Opened for manual installation, quitting app")
+        NSApp.terminate(nil)
     }
 
     // Open for manual installation (DMG path)
     private func openForManualInstallation(dmgPath: String, reason: String) async {
-        NotificationManager.shared.showNotification(
-            title: "EasyDMG",
-            message: reason
-        )
         NSWorkspace.shared.open(URL(fileURLWithPath: dmgPath))
+        ProgressWindowController.shared.hide()
+        isProcessing = false
+
+        // Quit after opening for manual install
+        print("✅ Opened for manual installation, quitting app")
+        NSApp.terminate(nil)
     }
 
     // Reveal app in Finder
@@ -335,10 +340,15 @@ class DMGProcessor: ObservableObject {
     // Handle errors
     private func handleError(_ message: String) async {
         print("Error: \(message)")
-        NotificationManager.shared.showNotification(
-            title: "EasyDMG Error",
-            message: message
-        )
+        showProgress("Error: \(message)")
+
+        // Keep error visible for 3 seconds
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        ProgressWindowController.shared.hide()
         isProcessing = false
+
+        // Quit after error
+        print("✅ Error handled, quitting app")
+        NSApp.terminate(nil)
     }
 }
