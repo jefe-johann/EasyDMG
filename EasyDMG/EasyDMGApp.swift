@@ -14,34 +14,57 @@ struct EasyDMGApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Hidden window group for background-only app
-        // This allows file associations to work properly
-        WindowGroup {
-            EmptyView()
-                .frame(width: 0, height: 0)
+        // Settings window - shown when launched directly
+        WindowGroup("EasyDMG") {
+            SettingsView()
         }
+        .windowResizability(.contentSize)
         .commands {
-            // Remove all menu commands for cleaner background operation
+            // Remove file menu commands
             CommandGroup(replacing: .newItem) { }
         }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 0, height: 0)
     }
 }
 
 // AppDelegate to handle file opening events
 class AppDelegate: NSObject, NSApplicationDelegate {
     private let dmgProcessor = DMGProcessor()
+    private var launchedWithFiles = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // This is called before application(_:open:)
+        // We use it to detect if files will be opened
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("✅ EasyDMG launched in background mode")
+        // Check if launched with files by seeing if application(_:open:) was called
+        // We'll set launchedWithFiles in that method
 
-        // Hide the empty window immediately
-        NSApp.windows.first?.orderOut(nil)
+        // Small delay to let file opening happen first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if !self.launchedWithFiles {
+                // Launched directly - show settings window with dock icon
+                print("✅ Launched directly - showing settings window")
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+            } else {
+                // Launched with DMG - stay in background
+                print("✅ Launched with DMG - staying in background")
+                NSApp.setActivationPolicy(.accessory)
+                self.hideAllWindows()
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         print("✅ application(_:open:) called with \(urls.count) file(s): \(urls)")
+        launchedWithFiles = true
+
+        // Hide settings window if it's visible
+        hideAllWindows()
+
+        // Stay in background mode when processing DMG
+        NSApp.setActivationPolicy(.accessory)
 
         for url in urls {
             print("✅ Checking file: \(url.path)")
@@ -56,13 +79,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Quit when settings window is closed
+        return true
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Prevent quit only while actively processing
         if dmgProcessor.isProcessing {
             print("⚠️ Still processing, preventing quit")
             return .terminateCancel
         }
-        print("✅ Processing complete, allowing termination")
+        print("✅ Allowing termination")
         return .terminateNow
+    }
+
+    private func hideAllWindows() {
+        for window in NSApp.windows {
+            window.orderOut(nil)
+        }
     }
 }

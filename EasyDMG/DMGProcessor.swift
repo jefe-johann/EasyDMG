@@ -228,20 +228,28 @@ class DMGProcessor: ObservableObject {
         }
 
         // Reveal in Finder (Step 3: 40% → 60%)
-        showProgress("Opening in Finder...", progress: 0.4)
-        revealInFinder(path: destinationPath)
+        if UserPreferences.shared.revealInFinder {
+            showProgress("Opening in Finder...", progress: 0.4)
+            revealInFinder(path: destinationPath)
+        } else {
+            showProgress("Finalizing installation...", progress: 0.4)
+        }
 
         // Unmount DMG (Step 4: 60% → 80%)
         showProgress("Cleaning up...", progress: 0.6)
         await unmountDMG(at: mountPoint)
 
         // Move to Trash (Step 5: 80% → 100%)
-        showProgress("Moving disk image to trash...", progress: 0.8)
-        let dmgURL = URL(fileURLWithPath: dmgPath)
-        do {
-            try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
-        } catch {
-            print("Warning: Failed to move DMG to trash: \(error)")
+        if UserPreferences.shared.autoTrashDMG {
+            showProgress("Moving disk image to trash...", progress: 0.8)
+            let dmgURL = URL(fileURLWithPath: dmgPath)
+            do {
+                try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
+            } catch {
+                print("Warning: Failed to move DMG to trash: \(error)")
+            }
+        } else {
+            showProgress("Keeping disk image...", progress: 0.8)
         }
 
         // Show completion message briefly

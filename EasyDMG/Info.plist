@@ -35,9 +35,5 @@
 	<!-- Privacy - Desktop Folder Access (required for App Store) -->
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyDMG needs access to install applications to your Applications folder.</string>
-
-	<!-- Run as background app with no dock icon -->
-	<key>LSUIElement</key>
-	<true/>
 </dict>
 </plist>
