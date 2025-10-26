@@ -111,7 +111,7 @@ class DMGProcessor: ObservableObject {
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-        task.arguments = ["attach", path, "-nobrowse"]
+        task.arguments = ["attach", path, "-nobrowse", "-readonly", "-noautoopen"]
 
         let pipe = Pipe()
         let errorPipe = Pipe()
@@ -232,7 +232,7 @@ class DMGProcessor: ObservableObject {
         revealInFinder(path: destinationPath)
 
         // Unmount DMG (Step 4: 60% → 80%)
-        showProgress("Unmounting disk image...", progress: 0.6)
+        showProgress("Cleaning up...", progress: 0.6)
         await unmountDMG(at: mountPoint)
 
         // Move to Trash (Step 5: 80% → 100%)
@@ -289,19 +289,48 @@ class DMGProcessor: ObservableObject {
         task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
         task.arguments = ["detach", mountPoint]
 
+        let errorPipe = Pipe()
+        task.standardError = errorPipe
+
         do {
             try task.run()
             task.waitUntilExit()
 
-            if task.terminationStatus != 0 {
-                print("Warning: Failed to detach DMG, trying force detach...")
-                // Try force detach
-                let forceTask = Process()
-                forceTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-                forceTask.arguments = ["detach", mountPoint, "-force"]
-                try? forceTask.run()
-                forceTask.waitUntilExit()
+            if task.terminationStatus == 0 {
+                print("✓ Clean detach succeeded")
+                return
             }
+
+            // Read error output
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            print("Detach failed: \(errorOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+
+            // Check for "resource busy" and retry once
+            if errorOutput.lowercased().contains("resource busy") {
+                print("Resource busy, waiting 250ms and retrying...")
+                try? await Task.sleep(nanoseconds: 250_000_000)
+
+                let retryTask = Process()
+                retryTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                retryTask.arguments = ["detach", mountPoint]
+                try? retryTask.run()
+                retryTask.waitUntilExit()
+
+                if retryTask.terminationStatus == 0 {
+                    print("✓ Retry detach succeeded")
+                    return
+                }
+            }
+
+            // Force detach as last resort
+            print("Using force detach...")
+            let forceTask = Process()
+            forceTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            forceTask.arguments = ["detach", mountPoint, "-force"]
+            try? forceTask.run()
+            forceTask.waitUntilExit()
+            print("✓ Force detach completed")
         } catch {
             print("Error unmounting DMG: \(error)")
         }
