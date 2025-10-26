@@ -124,9 +124,11 @@ struct InstallProgressView: View {
 
                 SwiftUI.ProgressView(value: progress, total: 1.0)
                     .progressViewStyle(.linear)
-                    .tint(.green)
+                    .tint(Color(red: 112/255, green: 113/255, blue: 112/255))
             }
         }
+        .tint(Color(red: 112/255, green: 113/255, blue: 112/255))
+        .environment(\.controlActiveState, .key)
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(VisualEffectView())

@@ -204,8 +204,9 @@ class DMGProcessor: ObservableObject {
                 return
             }
 
-            // User chose to replace - remove existing app
-            showProgress("Removing old version...", progress: 0.2)
+            // User chose to replace - ensure progress window is visible again
+            // (Alert dialog may have affected window ordering)
+            ProgressWindowController.shared.show(message: "Removing old version...", progress: 0.2)
             do {
                 try FileManager.default.removeItem(atPath: destinationPath)
             } catch {

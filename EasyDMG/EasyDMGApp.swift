@@ -51,7 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Launched with DMG - stay in background
                 print("✅ Launched with DMG - staying in background")
                 NSApp.setActivationPolicy(.accessory)
-                self.hideAllWindows()
+                self.hideSettingsWindow()
             }
         }
     }
@@ -60,8 +60,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("✅ application(_:open:) called with \(urls.count) file(s): \(urls)")
         launchedWithFiles = true
 
-        // Hide settings window if it's visible
-        hideAllWindows()
+        // Hide settings window if it's visible (but not progress window)
+        hideSettingsWindow()
 
         // Stay in background mode when processing DMG
         NSApp.setActivationPolicy(.accessory)
@@ -94,9 +94,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateNow
     }
 
-    private func hideAllWindows() {
+    private func hideSettingsWindow() {
+        // Only hide settings windows, not the progress window
         for window in NSApp.windows {
-            window.orderOut(nil)
+            // Don't hide the progress window (it has .floating level)
+            if window.level != .floating {
+                window.orderOut(nil)
+            }
         }
     }
 }

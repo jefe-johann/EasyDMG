@@ -32,6 +32,18 @@ struct SettingsView: View {
                 }
 
                 Spacer()
+
+                // App Store review button
+                Button(action: {
+                    // TODO: Update with actual App Store ID when published
+                    if let url = URL(string: "https://apps.apple.com/app/idXXXXXXXXXX?action=write-review") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    Label("Leave a Review", systemImage: "star.fill")
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.borderedProminent)
             }
             .padding(20)
             .background(Color(NSColor.controlBackgroundColor))
@@ -71,7 +83,7 @@ struct SetupTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Quick usage intro
-                Text("You can use 'Open With' on any DMG file to have EasyDMG seamlessly handle app installations and cleanup.")
+                Text("Right click any DMG and select 'Open With' to have EasyDMG seamlessly handle app installation and cleanup.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.bottom, 8)
@@ -93,16 +105,23 @@ struct SetupTabView: View {
                 .padding(.leading, 8)
 
                 // Screenshot
-                Image("easydmg-select")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .cornerRadius(8)
-                    .shadow(radius: 2)
-                    .padding(.top, 8)
+                HStack {
+                    Spacer()
+                    Image("easydmg-select")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 395)
+                        .cornerRadius(8)
+                        .shadow(radius: 2)
+                    Spacer()
+                }
+                .padding(.top, 8)
 
                 Text("Once set, double-clicking any DMG file will be handled by EasyDMG!")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -135,30 +154,21 @@ struct StepView: View {
 struct AboutTabView: View {
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Top spacing
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 20)
-
-                if let icon = NSApp.applicationIconImage {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 96, height: 96)
-                }
-
-                Text("EasyDMG")
-                    .font(.system(size: 28, weight: .bold))
-
-                Text("Version \(Bundle.main.appVersion)")
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Installing simple Mac apps should be one click!")
                     .font(.system(size: 14))
-                    .foregroundColor(.secondary)
 
-                Text("Makes installing Mac apps effortless")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                Text("If you've been annoyed by having to mount the DMG, drag the app to Applications, eject the disk, and then send the DMG to the trash (or forgetting the last two steps, and having a GB of old DMGs in your downloads folder 🫠) this app is for you.")
+                    .font(.system(size: 14))
+
+                Text("Skip the clunky routine. EasyDMG handles all of that automatically: mount, install, tidy up, done.")
+                    .font(.system(size: 14))
+
+                Text("If a DMG contains something unusual, like a license agreement, a .pkg installer, or a non-standard setup, EasyDMG won't guess. It simply opens the image and lets you take it from there, so you always stay in control.")
+                    .font(.system(size: 14))
+
+                Spacer()
+                    .frame(height: 20)
 
                 HStack(spacing: 16) {
                     Button(action: {
@@ -173,19 +183,8 @@ struct AboutTabView: View {
                         Label("Report Issue", systemImage: "exclamationmark.bubble")
                     }
                 }
-                .padding(.top, 8)
-
-                // Bottom spacing
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 30)
-
-                Text("Created with care for the Mac community")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 16)
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
         }
     }
