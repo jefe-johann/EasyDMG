@@ -9,31 +9,81 @@
 import Foundation
 import AppKit
 import Combine
+import UserNotifications
 
 @MainActor
 class DMGProcessor: ObservableObject {
     @Published var isProcessing = false
+    private var currentFeedbackMode: FeedbackMode = .progressBar
 
     private func showProgress(_ message: String, progress: Double) {
         print("📝 \(message) (\(Int(progress * 100))%)")
-        ProgressWindowController.shared.update(message: message, progress: progress)
+
+        // Only show progress window if feedback mode is progress bar
+        if currentFeedbackMode == .progressBar {
+            ProgressWindowController.shared.update(message: message, progress: progress)
+        }
+    }
+
+    private func sendNotification(title: String, message: String) async {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = message
+        content.sound = .default
+
+        // Use 1-second delay trigger to ensure notification delivers after app quits
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            print("❌ Notification error: \(error)")
+        }
+    }
+
+    // Request notification permissions if needed
+    private func requestNotificationPermissionsIfNeeded() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+
+        if settings.authorizationStatus == .notDetermined {
+            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        }
+    }
+
+    // Get the effective feedback mode (fallback to progress bar if notifications denied)
+    private func effectiveFeedbackMode() async -> FeedbackMode {
+        let userMode = UserPreferences.shared.feedbackMode
+
+        // If user wants notifications, check if permission is granted
+        if userMode == .notification {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            if settings.authorizationStatus == .denied {
+                return .progressBar
+            }
+        }
+
+        return userMode
     }
 
     // Process a DMG file (main entry point)
     func processDMG(at url: URL) async {
-        print("🔵 DMGProcessor.processDMG called with: \(url.path)")
-
         guard !isProcessing else {
-            print("⚠️ Already processing a DMG file")
             return
         }
 
         isProcessing = true
-        print("🔵 Setting isProcessing = true")
 
-        // Show progress window
-        print("🔵 Showing progress window...")
-        ProgressWindowController.shared.show(message: "Preparing...", progress: 0.0)
+        // Request notification permissions early (before checking effective mode)
+        await requestNotificationPermissionsIfNeeded()
+
+        // Determine effective feedback mode (with fallback for denied notifications)
+        currentFeedbackMode = await effectiveFeedbackMode()
+
+        // Show progress window only in progress bar mode
+        if currentFeedbackMode == .progressBar {
+            ProgressWindowController.shared.show(message: "Preparing...", progress: 0.0)
+        }
 
         // Validate the DMG file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -220,6 +270,15 @@ class DMGProcessor: ObservableObject {
         showProgress("Installing to Applications...", progress: 0.2)
         do {
             try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
+
+            // Remove quarantine attributes to prevent false "needs update" states
+            // This replicates the behavior of manual Finder drag-and-drop installation
+            await removeQuarantineAttributes(from: destinationPath)
+
+            // Send notification if in notification mode
+            if currentFeedbackMode == .notification {
+                await sendNotification(title: "EasyDMG", message: "\(appName) installed successfully")
+            }
         } catch {
             await handleError("Installation failed")
             await unmountDMG(at: mountPoint)
@@ -244,15 +303,19 @@ class DMGProcessor: ObservableObject {
             print("Warning: Failed to move DMG to trash: \(error)")
         }
 
-        // Show completion message briefly
-        showProgress("Installation complete!", progress: 1.0)
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Handle completion based on feedback mode
+        if currentFeedbackMode == .progressBar {
+            // Show completion message briefly in progress bar mode
+            showProgress("Installation complete!", progress: 1.0)
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        }
 
-        // Hide the progress window
+        // Hide the progress window (only visible in progress bar mode)
         ProgressWindowController.shared.hide()
         isProcessing = false
 
         // Quit the app after processing is complete
+        // Note: Notifications use 1-second trigger, so they'll deliver after app quits
         print("✅ Processing complete, quitting app")
         NSApp.terminate(nil)
     }
@@ -346,6 +409,37 @@ class DMGProcessor: ObservableObject {
             try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
         } catch {
             print("Warning: Failed to move DMG to trash: \(error)")
+        }
+    }
+
+    // Remove quarantine attributes from installed app
+    // This prevents apps with auto-update mechanisms from incorrectly detecting
+    // "needs update" states that can cause unwanted behavior
+    private func removeQuarantineAttributes(from path: String) async {
+        print("Removing quarantine attributes from \(path)...")
+
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        task.arguments = ["-dr", "com.apple.quarantine", path]
+
+        let errorPipe = Pipe()
+        task.standardError = errorPipe
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+
+            if task.terminationStatus == 0 {
+                print("✓ Quarantine attributes removed")
+            } else {
+                // Read error but don't fail - this is non-critical
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+                print("Note: Could not remove quarantine attributes: \(errorOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
+        } catch {
+            // Non-fatal error - log and continue
+            print("Note: xattr command failed: \(error)")
         }
     }
 
