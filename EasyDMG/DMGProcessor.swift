@@ -109,8 +109,20 @@ class DMGProcessor: ObservableObject {
         showProgress("Scanning for apps...", progress: 0.2)
         let appFiles = findAppFiles(in: mountPoint)
 
+        // Filter out helper/uninstaller apps if there's a main app
+        let mainApps = appFiles.filter { path in
+            let name = (path as NSString).lastPathComponent.lowercased()
+            return !name.contains("uninstall") &&
+                   !name.contains("installer") &&
+                   !name.contains("helper") &&
+                   !name.contains("readme")
+        }
+
+        // Use filtered list if we got exactly 1 main app, otherwise use original list
+        let finalAppFiles = mainApps.count == 1 ? mainApps : appFiles
+
         // Handle different scenarios
-        switch appFiles.count {
+        switch finalAppFiles.count {
         case 0:
             print("No .app files found")
             await openForManualInstallation(mountPoint: mountPoint)
@@ -118,11 +130,13 @@ class DMGProcessor: ObservableObject {
 
         case 1:
             // Single app found - proceed with installation
-            let appPath = appFiles[0]
+            let appPath = finalAppFiles[0]
+            print("Installing: \((appPath as NSString).lastPathComponent)")
             await installApp(from: appPath, mountPoint: mountPoint, dmgPath: url.path)
 
         default:
-            print("Multiple .app files found (\(appFiles.count))")
+            print("Multiple .app files found (\(finalAppFiles.count))")
+            print("Apps found: \(finalAppFiles.map { ($0 as NSString).lastPathComponent })")
             await openForManualInstallation(mountPoint: mountPoint)
             return
         }
@@ -210,6 +224,61 @@ class DMGProcessor: ObservableObject {
         }
     }
 
+    // Calculate app bundle size
+    private func calculateAppSize(at path: String) -> UInt64 {
+        guard let enumerator = FileManager.default.enumerator(atPath: path) else {
+            return 0
+        }
+
+        var totalSize: UInt64 = 0
+        for case let file as String in enumerator {
+            let filePath = (path as NSString).appendingPathComponent(file)
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath),
+               let fileSize = attrs[.size] as? UInt64 {
+                totalSize += fileSize
+            }
+        }
+        return totalSize
+    }
+
+    // Check if enough disk space available
+    private func hasEnoughDiskSpace(requiredBytes: UInt64) -> Bool {
+        let appFolderPath = "/Applications"
+        guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: appFolderPath),
+              let freeSpace = attrs[.systemFreeSize] as? UInt64 else {
+            // If we can't check, proceed anyway (defensive)
+            return true
+        }
+
+        // Require app size + 500MB buffer
+        let bufferSize: UInt64 = 500 * 1024 * 1024
+        return freeSpace > (requiredBytes + bufferSize)
+    }
+
+    // Validate /Applications folder exists and is writable
+    private func validateApplicationsFolder() -> String? {
+        let appFolder = "/Applications"
+
+        // Check if /Applications exists
+        guard FileManager.default.fileExists(atPath: appFolder) else {
+            return "/Applications folder does not exist"
+        }
+
+        // Check if it's a directory (not a file)
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: appFolder, isDirectory: &isDirectory)
+        guard isDirectory.boolValue else {
+            return "/Applications is not a directory"
+        }
+
+        // Check if it's writable
+        guard FileManager.default.isWritableFile(atPath: appFolder) else {
+            return "/Applications folder is not writable"
+        }
+
+        return nil  // All checks passed
+    }
+
     // Find .app files in a directory (root level only)
     private func findAppFiles(in mountPoint: String) -> [String] {
         let fileManager = FileManager.default
@@ -218,7 +287,7 @@ class DMGProcessor: ObservableObject {
         do {
             let contents = try fileManager.contentsOfDirectory(atPath: mountPoint)
             for item in contents {
-                if item.hasSuffix(".app") {
+                if item.hasSuffix(".app") && !item.hasPrefix(".") {
                     let fullPath = (mountPoint as NSString).appendingPathComponent(item)
                     appFiles.append(fullPath)
                 }
@@ -235,6 +304,14 @@ class DMGProcessor: ObservableObject {
     private func installApp(from appPath: String, mountPoint: String, dmgPath: String) async {
         let appName = (appPath as NSString).lastPathComponent
         let destinationPath = "/Applications/\(appName)"
+
+        // Validate /Applications folder first
+        if let errorMessage = validateApplicationsFolder() {
+            await handleError(errorMessage)
+            await unmountDMG(at: mountPoint)
+            isProcessing = false
+            return
+        }
 
         // Check if app already exists
         if FileManager.default.fileExists(atPath: destinationPath) {
@@ -266,6 +343,17 @@ class DMGProcessor: ObservableObject {
                 isProcessing = false
                 return
             }
+        }
+
+        // Check disk space before copying
+        showProgress("Checking disk space...", progress: 0.15)
+        let appSize = calculateAppSize(at: appPath)
+        if !hasEnoughDiskSpace(requiredBytes: appSize) {
+            let sizeInGB = Double(appSize) / (1024 * 1024 * 1024)
+            await handleError("Insufficient disk space (need \(String(format: "%.1f", sizeInGB))GB)")
+            await unmountDMG(at: mountPoint)
+            isProcessing = false
+            return
         }
 
         // Copy app to /Applications (Step 2: 20% → 40%)
