@@ -98,8 +98,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-# Local debug documentation
-EDGE_CASES.md
-FINDER_ACTIVATION_DEBUG.md
-CLAUDE.md
-TESTING.md
+# Local debug documentation and deprecated docs
+*.md
+Deprecated_Docs/
