@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 import UserNotifications
+import Sparkle
 
 @main
 struct EasyDMGApp: App {
@@ -31,6 +32,18 @@ struct EasyDMGApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let dmgProcessor = DMGProcessor()
     private var launchedWithFiles = false
+    private let updaterController: SPUStandardUpdaterController
+
+    override init() {
+        // Initialize Sparkle updater
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        super.init()
+    }
+
+    // Expose updater for settings UI
+    var updater: SPUUpdater {
+        updaterController.updater
+    }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // This is called before application(_:open:)

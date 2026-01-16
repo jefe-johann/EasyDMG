@@ -79,6 +79,7 @@
 			);
 			name = EasyDMG;
 			packageProductDependencies = (
+				1F889A7B2EB000010065ECE5 /* Sparkle */,
 			);
 			productName = EasyDMG;
 			productReference = 1F889A532EAC112E0065ECE5 /* EasyDMG.app */;
@@ -108,6 +109,9 @@
 			);
 			mainGroup = 1F889A4A2EAC112E0065ECE5;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1F889A7A2EB000000065ECE5 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1F889A542EAC112E0065ECE5 /* Products */;
 			projectDirPath = "";
@@ -354,6 +358,25 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1F889A7A2EB000000065ECE5 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1F889A7B2EB000010065ECE5 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1F889A7A2EB000000065ECE5 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		1F889A4E2EAC112E0065ECE5 /* Build configuration list for PBXProject "EasyDMG" */ = {

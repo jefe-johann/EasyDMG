@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import Sparkle
 
 struct SettingsView: View {
     @StateObject private var preferences = UserPreferences.shared
@@ -32,18 +33,6 @@ struct SettingsView: View {
                 }
 
                 Spacer()
-
-                // App Store review button
-                Button(action: {
-                    // TODO: Update with actual App Store ID when published
-                    if let url = URL(string: "https://apps.apple.com/app/idXXXXXXXXXX?action=write-review") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }) {
-                    Label("Leave a Review", systemImage: "star.fill")
-                        .font(.system(size: 13))
-                }
-                .buttonStyle(.borderedProminent)
             }
             .padding(20)
             .background(Color(NSColor.controlBackgroundColor))
@@ -227,9 +216,11 @@ struct SettingsTabView: View {
                 Divider()
                     .padding(.vertical, 8)
 
-                Text("These settings only apply to automatic installations. Manual installations will always open the mounted volume.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("Updates")
+                    .font(.headline)
+
+                CheckForUpdatesView()
+                    .padding(.leading, 8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -285,9 +276,46 @@ class UserPreferences: ObservableObject {
         self.autoTrashDMG = UserDefaults.standard.object(forKey: "autoTrashDMG") as? Bool ?? true
         self.revealInFinder = UserDefaults.standard.object(forKey: "revealInFinder") as? Bool ?? true
 
-        // Default to notification mode
-        let savedMode = UserDefaults.standard.string(forKey: "feedbackMode") ?? FeedbackMode.notification.rawValue
-        self.feedbackMode = FeedbackMode(rawValue: savedMode) ?? .notification
+        // Default to progress bar mode
+        let savedMode = UserDefaults.standard.string(forKey: "feedbackMode") ?? FeedbackMode.progressBar.rawValue
+        self.feedbackMode = FeedbackMode(rawValue: savedMode) ?? .progressBar
+    }
+}
+
+// MARK: - Sparkle Updates View
+
+struct CheckForUpdatesView: View {
+    @State private var canCheckForUpdates = false
+    @State private var automaticallyChecks = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Button("Check for Updates...") {
+                    guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
+                    appDelegate.updater.checkForUpdates()
+                }
+                .disabled(!canCheckForUpdates)
+
+                Spacer()
+            }
+
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { automaticallyChecks },
+                set: { newValue in
+                    automaticallyChecks = newValue
+                    if let appDelegate = NSApp.delegate as? AppDelegate {
+                        appDelegate.updater.automaticallyChecksForUpdates = newValue
+                    }
+                }
+            ))
+            .toggleStyle(.checkbox)
+        }
+        .onAppear {
+            guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
+            canCheckForUpdates = appDelegate.updater.canCheckForUpdates
+            automaticallyChecks = appDelegate.updater.automaticallyChecksForUpdates
+        }
     }
 }
 

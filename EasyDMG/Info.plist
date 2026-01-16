@@ -41,5 +41,22 @@
 	<array>
 		<string>Fonts/Quantico-Regular.ttf</string>
 	</array>
+
+	<!-- Sparkle Updates Configuration -->
+	<!-- TODO: Set SUFeedURL to your appcast URL when ready to deploy -->
+	<key>SUFeedURL</key>
+	<string>https://your-domain.com/appcast.xml</string>
+
+	<!-- TODO: Replace with your Ed25519 public key after generating with generate_keys tool -->
+	<key>SUPublicEDKey</key>
+	<string>doeaeRdH5xW0u0BSsX2/NMq8XUHnbMqR0x9+vWFv7Ow=</string>
+
+	<!-- Check for updates automatically -->
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+
+	<!-- Check for updates every 24 hours (86400 seconds) -->
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>
