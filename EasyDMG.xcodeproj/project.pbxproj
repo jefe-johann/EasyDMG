@@ -144,7 +144,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Auto-copy to /Applications for testing\nset -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nDST=\"/Applications/EasyDMG_XCODE_TEST.app\"\n\n# Compare binary files, not bundle directories (fixes incremental build detection)\nSRC_BIN=\"${SRC}/Contents/MacOS/${PRODUCT_NAME}\"\nDST_BIN=\"${DST}/Contents/MacOS/${PRODUCT_NAME}\"\n\n# Only copy if binary missing or newer\nif [ ! -f \"$DST_BIN\" ] || [ \"$SRC_BIN\" -nt \"$DST_BIN\" ]; then\n  # Remove old, then copy preserving bundle metadata\n  rm -rf \"$DST\"\n  /usr/bin/ditto \"$SRC\" \"$DST\"\n  \n  # Register with Launch Services so it appears in \"Open With\"\n  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \"$DST\"\n  \n  echo \"✓ Copied to $DST (binary updated)\"\nelse\n  echo \"⏭ Skipped copy (binary unchanged)\"\nfi\n";
+			shellScript = "# Auto-copy to /Applications for testing\nset -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nDST=\"/Applications/EasyDMG_XCODE_TEST.app\"\n\n# Compare binary files, not bundle directories (fixes incremental build detection)\nSRC_BIN=\"${SRC}/Contents/MacOS/${PRODUCT_NAME}\"\nDST_BIN=\"${DST}/Contents/MacOS/${PRODUCT_NAME}\"\n\n# Only copy if binary missing or newer\nif [ ! -f \"$DST_BIN\" ] || [ \"$SRC_BIN\" -nt \"$DST_BIN\" ]; then\n  # Remove old, then copy preserving bundle metadata\n  rm -rf \"$DST\"\n  /usr/bin/ditto \"$SRC\" \"$DST\"\n  \n  # Re-sign with ad-hoc signature (deep and force to handle preview dylibs)\n  /usr/bin/codesign -s - --deep --force \"$DST\"\n  \n  # Register with Launch Services so it appears in \"Open With\"\n  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \"$DST\"\n  \n  echo \"✓ Copied to $DST (binary updated)\"\nelse\n  echo \"⏭ Skipped copy (binary unchanged)\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -288,6 +288,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EasyDMG/EasyDMG.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -303,7 +305,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jeff.easydmg;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -321,7 +323,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = EasyDMG/EasyDMG.entitlements;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -336,7 +340,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jeff.easydmg;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

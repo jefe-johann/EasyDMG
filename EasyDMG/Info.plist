@@ -32,7 +32,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 
-	<!-- Privacy - Desktop Folder Access (required for App Store) -->
+	<!-- Privacy - Desktop Folder Usage (informational only, not enforced outside App Store) -->
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyDMG needs access to install applications to your Applications folder.</string>
 
