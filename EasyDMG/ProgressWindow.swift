@@ -118,7 +118,7 @@ struct InstallProgressView: View {
             // Text and progress bar
             VStack(alignment: .leading, spacing: 6) {
                 Text(state.message)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.custom("Quantico-Regular", size: 13))
                     .lineLimit(1)
 
                 // Custom progress bar with manual drawing (SwiftUI's .tint() is unreliable on macOS)

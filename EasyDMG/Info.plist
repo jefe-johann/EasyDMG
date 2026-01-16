@@ -35,5 +35,11 @@
 	<!-- Privacy - Desktop Folder Access (required for App Store) -->
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyDMG needs access to install applications to your Applications folder.</string>
+
+	<!-- Fonts provided by application -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fonts/Quantico-Regular.ttf</string>
+	</array>
 </dict>
 </plist>

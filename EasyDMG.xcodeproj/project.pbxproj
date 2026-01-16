@@ -144,7 +144,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nset -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nDST=\"/Applications/${FULL_PRODUCT_NAME}\"\n\n# Only copy if missing or newer\nif [ ! -d \"$DST\" ] || [ \"$SRC\" -nt \"$DST\" ]; then\n  # Remove old, then copy preserving bundle metadata\n  rm -rf \"$DST\"\n  /usr/bin/ditto \"$SRC\" \"$DST\"\n\n  # Optional: reveal the installed app after copy\n  # /usr/bin/open -R \"$DST\"\nfi\n";
+			shellScript = "# Auto-copy to /Applications for testing\nset -euo pipefail\nSRC=\"${BUILT_PRODUCTS_DIR}/${FULL_PRODUCT_NAME}\"\nDST=\"/Applications/EasyDMG_XCODE_TEST.app\"\n\n# Only copy if missing or newer\nif [ ! -d \"$DST\" ] || [ \"$SRC\" -nt \"$DST\" ]; then\n  # Remove old, then copy preserving bundle metadata\n  rm -rf \"$DST\"\n  /usr/bin/ditto \"$SRC\" \"$DST\"\n  \n  # Register with Launch Services so it appears in \"Open With\"\n  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \"$DST\"\n  \n  echo \"✓ Copied to $DST\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -197,7 +197,7 @@
 				DEVELOPMENT_TEAM = M2ABUL7722;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -261,7 +261,7 @@
 				DEVELOPMENT_TEAM = M2ABUL7722;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
