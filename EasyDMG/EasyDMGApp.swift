@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 @main
 struct EasyDMGApp: App {
@@ -27,7 +28,7 @@ struct EasyDMGApp: App {
 }
 
 // AppDelegate to handle file opening events
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let dmgProcessor = DMGProcessor()
     private var launchedWithFiles = false
 
@@ -37,6 +38,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Set notification delegate to show notifications even when app is active
+        UNUserNotificationCenter.current().delegate = self
+
+        // Request notification permissions
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error = error {
+                print("❌ Notification authorization error: \(error)")
+            } else if granted {
+                print("✅ Notification authorization granted")
+            } else {
+                print("⚠️ Notification authorization denied")
+            }
+        }
+
         // Check if launched with files by seeing if application(_:open:) was called
         // We'll set launchedWithFiles in that method
 
@@ -102,5 +117,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 window.orderOut(nil)
             }
         }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show notifications even when app is in foreground/active
+        completionHandler([.banner, .sound])
     }
 }

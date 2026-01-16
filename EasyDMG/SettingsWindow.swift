@@ -99,7 +99,7 @@ struct SetupTabView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     StepView(number: 1, text: "Right-click any .dmg file")
                     StepView(number: 2, text: "Select \"Get Info\"")
-                    StepView(number: 3, text: "Under \"Open with:\", choose EasyDMG")
+                    StepView(number: 3, text: "Under \"Open with:\" choose EasyDMG")
                     StepView(number: 4, text: "Click \"Change All...\"")
                 }
                 .padding(.leading, 8)
@@ -119,7 +119,7 @@ struct SetupTabView: View {
 
                 Text("Once set, double-clicking any DMG file will be handled by EasyDMG!")
                     .font(.body)
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 12)
@@ -202,6 +202,20 @@ struct SettingsTabView: View {
                     .font(.headline)
 
                 VStack(alignment: .leading, spacing: 16) {
+                    // Feedback mode picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Installation feedback:")
+                            .font(.body)
+
+                        Picker("", selection: $preferences.feedbackMode) {
+                            ForEach(FeedbackMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 400, alignment: .leading)
+                    }
+
                     Toggle("Automatically move DMG to trash after installation", isOn: $preferences.autoTrashDMG)
                         .toggleStyle(.checkbox)
 
@@ -223,6 +237,27 @@ struct SettingsTabView: View {
     }
 }
 
+// MARK: - Feedback Mode
+
+enum FeedbackMode: String, CaseIterable, Identifiable {
+    case progressBar = "progressBar"
+    case notification = "notification"
+    case silent = "silent"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .progressBar:
+            return "Show progress bar during DMG handling"
+        case .notification:
+            return "Show notification when installation is complete"
+        case .silent:
+            return "Silent"
+        }
+    }
+}
+
 // MARK: - User Preferences
 
 class UserPreferences: ObservableObject {
@@ -240,9 +275,19 @@ class UserPreferences: ObservableObject {
         }
     }
 
+    @Published var feedbackMode: FeedbackMode {
+        didSet {
+            UserDefaults.standard.set(feedbackMode.rawValue, forKey: "feedbackMode")
+        }
+    }
+
     private init() {
         self.autoTrashDMG = UserDefaults.standard.object(forKey: "autoTrashDMG") as? Bool ?? true
         self.revealInFinder = UserDefaults.standard.object(forKey: "revealInFinder") as? Bool ?? true
+
+        // Default to notification mode
+        let savedMode = UserDefaults.standard.string(forKey: "feedbackMode") ?? FeedbackMode.notification.rawValue
+        self.feedbackMode = FeedbackMode(rawValue: savedMode) ?? .notification
     }
 }
 
