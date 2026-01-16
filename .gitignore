@@ -97,3 +97,7 @@ iOSInjectionProject/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Local debug documentation
+EDGE_CASES.md
+FINDER_ACTIVATION_DEBUG.md
