@@ -1,0 +1,300 @@
+//
+//  SettingsWindow.swift
+//  EasyDMG
+//
+//  Settings window with Setup, About, and Settings tabs
+//
+
+import SwiftUI
+import AppKit
+import Combine
+
+struct SettingsView: View {
+    @StateObject private var preferences = UserPreferences.shared
+    @State private var selectedTab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with app icon and title (always visible)
+            HStack(spacing: 12) {
+                if let icon = NSApp.applicationIconImage {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 64, height: 64)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("EasyDMG")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("Version \(Bundle.main.appVersion)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // App Store review button
+                Button(action: {
+                    // TODO: Update with actual App Store ID when published
+                    if let url = URL(string: "https://apps.apple.com/app/idXXXXXXXXXX?action=write-review") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    Label("Leave a Review", systemImage: "star.fill")
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(20)
+            .background(Color(NSColor.controlBackgroundColor))
+
+            Divider()
+
+            // Tabbed content
+            TabView(selection: $selectedTab) {
+                SetupTabView()
+                    .tabItem {
+                        Label("Setup", systemImage: "gearshape.2")
+                    }
+                    .tag(0)
+
+                AboutTabView()
+                    .tabItem {
+                        Label("About", systemImage: "info.circle")
+                    }
+                    .tag(1)
+
+                SettingsTabView(preferences: preferences)
+                    .tabItem {
+                        Label("Settings", systemImage: "slider.horizontal.3")
+                    }
+                    .tag(2)
+            }
+            .padding(20)
+        }
+        .frame(width: 550, height: 450)
+    }
+}
+
+// MARK: - Setup Tab
+
+struct SetupTabView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Quick usage intro
+                Text("Right click any DMG and select 'Open With' to have EasyDMG seamlessly handle app installation and cleanup.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 8)
+
+                Divider()
+
+                Text("Set as Default for DMG Files")
+                    .font(.headline)
+
+                Text("To make EasyDMG your default app for installing DMG files:")
+                    .foregroundColor(.secondary)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    StepView(number: 1, text: "Right-click any .dmg file")
+                    StepView(number: 2, text: "Select \"Get Info\"")
+                    StepView(number: 3, text: "Under \"Open with:\" choose EasyDMG")
+                    StepView(number: 4, text: "Click \"Change All...\"")
+                }
+                .padding(.leading, 8)
+
+                // Screenshot
+                HStack {
+                    Spacer()
+                    Image("easydmg-select")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 395)
+                        .cornerRadius(8)
+                        .shadow(radius: 2)
+                    Spacer()
+                }
+                .padding(.top, 8)
+
+                Text("Once set, double-clicking any DMG file will be handled by EasyDMG!")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 12)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+}
+
+struct StepView: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 24, height: 24)
+                Text("\(number)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            Text(text)
+        }
+    }
+}
+
+// MARK: - About Tab
+
+struct AboutTabView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Installing simple Mac apps should be one click!")
+                    .font(.system(size: 14))
+
+                Text("If you've been annoyed by having to mount the DMG, drag the app to Applications, eject the disk, and then send the DMG to the trash (or forgetting the last two steps, and having a GB of old DMGs in your downloads folder 🫠) this app is for you.")
+                    .font(.system(size: 14))
+
+                Text("Skip the clunky routine. EasyDMG handles all of that automatically: mount, install, tidy up, done.")
+                    .font(.system(size: 14))
+
+                Text("If a DMG contains something unusual, like a license agreement, a .pkg installer, or a non-standard setup, EasyDMG won't guess. It simply opens the image and lets you take it from there, so you always stay in control.")
+                    .font(.system(size: 14))
+
+                Spacer()
+                    .frame(height: 20)
+
+                HStack(spacing: 16) {
+                    Button(action: {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/yourusername/easydmg")!)
+                    }) {
+                        Label("GitHub", systemImage: "link")
+                    }
+
+                    Button(action: {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/yourusername/easydmg/issues")!)
+                    }) {
+                        Label("Report Issue", systemImage: "exclamationmark.bubble")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+}
+
+// MARK: - Settings Tab
+
+struct SettingsTabView: View {
+    @ObservedObject var preferences: UserPreferences
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Installation Preferences")
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    // Feedback mode picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Installation feedback:")
+                            .font(.body)
+
+                        Picker("", selection: $preferences.feedbackMode) {
+                            ForEach(FeedbackMode.allCases) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 400, alignment: .leading)
+                    }
+
+                    Toggle("Automatically move DMG to trash after installation", isOn: $preferences.autoTrashDMG)
+                        .toggleStyle(.checkbox)
+
+                    Toggle("Reveal app in Finder after installation", isOn: $preferences.revealInFinder)
+                        .toggleStyle(.checkbox)
+                }
+                .padding(.leading, 8)
+
+                Divider()
+                    .padding(.vertical, 8)
+
+                Text("These settings only apply to automatic installations. Manual installations will always open the mounted volume.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+    }
+}
+
+// MARK: - Feedback Mode
+
+enum FeedbackMode: String, CaseIterable, Identifiable {
+    case progressBar = "progressBar"
+    case notification = "notification"
+    case silent = "silent"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .progressBar:
+            return "Show progress bar during DMG handling"
+        case .notification:
+            return "Show notification when installation is complete"
+        case .silent:
+            return "Silent"
+        }
+    }
+}
+
+// MARK: - User Preferences
+
+class UserPreferences: ObservableObject {
+    static let shared = UserPreferences()
+
+    @Published var autoTrashDMG: Bool {
+        didSet {
+            UserDefaults.standard.set(autoTrashDMG, forKey: "autoTrashDMG")
+        }
+    }
+
+    @Published var revealInFinder: Bool {
+        didSet {
+            UserDefaults.standard.set(revealInFinder, forKey: "revealInFinder")
+        }
+    }
+
+    @Published var feedbackMode: FeedbackMode {
+        didSet {
+            UserDefaults.standard.set(feedbackMode.rawValue, forKey: "feedbackMode")
+        }
+    }
+
+    private init() {
+        self.autoTrashDMG = UserDefaults.standard.object(forKey: "autoTrashDMG") as? Bool ?? true
+        self.revealInFinder = UserDefaults.standard.object(forKey: "revealInFinder") as? Bool ?? true
+
+        // Default to notification mode
+        let savedMode = UserDefaults.standard.string(forKey: "feedbackMode") ?? FeedbackMode.notification.rawValue
+        self.feedbackMode = FeedbackMode(rawValue: savedMode) ?? .notification
+    }
+}
+
+// MARK: - Bundle Extension
+
+extension Bundle {
+    var appVersion: String {
+        return infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+}
