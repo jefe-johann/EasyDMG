@@ -1,10 +1,14 @@
-<p align="center">
+<div align="center">
   <img src=".github/images/wizardhamster.png" alt="EasyDMG Logo" width="175">
-  <br><br>
-  <strong><font size="6">EasyDMG</font></strong>
-  <br><br>
-  Automate DMG installation on macOS. Double-click a DMG file, and EasyDMG handles the rest - mounting, copying to Applications, unmounting, and cleanup.
-</p>
+  <h1>EasyDMG</h1>
+  <p>
+    Automate DMG installation on macOS. Double-click a DMG file, and EasyDMG handles the rest — mounting, copying to Applications, unmounting, and cleanup.
+  </p>
+  <br>
+  <font size="4"><strong> Download .dmg from 
+    <a href="https://github.com/jefe-johann/EasyDMG/releases">Releases</a>
+  </strong></font>
+</div>
 
 ## Features
 
