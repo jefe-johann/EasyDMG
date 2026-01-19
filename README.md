@@ -1,6 +1,10 @@
-# EasyDMG
-
-Automate DMG installation on macOS. Double-click a DMG file, and EasyDMG handles the rest - mounting, copying to Applications, unmounting, and cleanup.
+<p align="center">
+  <img src=".github/images/wizardhamster.png" alt="EasyDMG Logo" width="175">
+  <br><br>
+  <strong><font size="6">EasyDMG</font></strong>
+  <br><br>
+  Automate DMG installation on macOS. Double-click a DMG file, and EasyDMG handles the rest - mounting, copying to Applications, unmounting, and cleanup.
+</p>
 
 ## Features
 
