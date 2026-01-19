@@ -161,13 +161,13 @@ struct AboutTabView: View {
 
                 HStack(spacing: 16) {
                     Button(action: {
-                        NSWorkspace.shared.open(URL(string: "https://github.com/yourusername/easydmg")!)
+                        NSWorkspace.shared.open(URL(string: "https://github.com/jefe-johann/EasyDMG")!)
                     }) {
                         Label("GitHub", systemImage: "link")
                     }
 
                     Button(action: {
-                        NSWorkspace.shared.open(URL(string: "https://github.com/yourusername/easydmg/issues")!)
+                        NSWorkspace.shared.open(URL(string: "https://github.com/jefe-johann/EasyDMG/issues")!)
                     }) {
                         Label("Report Issue", systemImage: "exclamationmark.bubble")
                     }

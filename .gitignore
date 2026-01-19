@@ -100,4 +100,8 @@ Temporary Items
 
 # Local debug documentation and deprecated docs
 *.md
+!README.md
 Deprecated_Docs/
+
+# Sensitive build configuration
+exportOptions.plist
