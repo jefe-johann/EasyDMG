@@ -105,6 +105,7 @@ Temporary Items
 !CLA.md
 !COMMERCIAL-LICENSE.md
 Deprecated_Docs/
+Docs/
 
 # Sensitive build configuration
 exportOptions.plist
