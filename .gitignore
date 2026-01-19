@@ -109,3 +109,6 @@ Docs/
 
 # Sensitive build configuration
 exportOptions.plist
+AGENTS.md
+
+gemini.md
