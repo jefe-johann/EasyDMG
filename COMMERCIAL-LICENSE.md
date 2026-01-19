@@ -31,7 +31,7 @@ If you wish to use EasyDMG in a proprietary product without GPL-3.0 restrictions
 ### Commercial License Pricing:
 
 **Contact for pricing:**
-- Email: jeff@yourcontact.com (update with your actual contact)
+- Email: jeffschumann.dev@gmail.com
 - GitHub: https://github.com/jefe-johann/EasyDMG/issues
 
 Pricing is based on:
@@ -65,4 +65,4 @@ Not sure which license you need? Here's a quick guide:
 - You cannot or don't want to share source code
 - You're embedding EasyDMG in a commercial product
 
-Still unsure? Contact us and we'll help you determine the right license for your use case.
+Still unsure? Contact jeffschumann.dev@gmail.com and we'll help you determine the right license for your use case.

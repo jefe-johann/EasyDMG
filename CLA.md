@@ -59,7 +59,7 @@ GitHub: @[your-username]
 **For Corporate Contributors:**
 
 If contributing on behalf of your employer, please have an authorized representative contact:
-- Email: jeff@yourcontact.com (update with your actual contact)
+- Email: jeffschumann.dev@gmail.com
 - Subject: "Corporate CLA - EasyDMG"
 
 ## Why We Need This
@@ -76,7 +76,7 @@ This is a common practice for dual-licensed open source projects.
 
 If you have questions about this CLA, please:
 - Open an issue: https://github.com/jefe-johann/EasyDMG/issues
-- Contact: jeff@yourcontact.com (update with your actual contact)
+- Contact: jeffschumann.dev@gmail.com
 
 ## Small Contributions Exception
 
