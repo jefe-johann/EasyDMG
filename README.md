@@ -77,11 +77,20 @@ Built with SwiftUI and AppKit:
 
 ## License
 
-MIT License - see LICENSE file for details
+EasyDMG is dual-licensed:
+
+- **GPL-3.0** for open source use - see [LICENSE](LICENSE) file
+- **Commercial License** available for proprietary use - see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)
+
+If you're using EasyDMG in an open source project, you're covered by GPL-3.0. If you need to use it in a closed-source/proprietary application, contact us about commercial licensing.
 
 ## Contributing
 
-Contributions welcome! Please open an issue to discuss proposed changes.
+Contributions welcome! Please note:
+
+1. By contributing, you agree to the [Contributor License Agreement (CLA)](CLA.md)
+2. All contributions will be dual-licensed under GPL-3.0 and commercial licenses
+3. Open an issue to discuss proposed changes before submitting large PRs
 
 ## Support
 

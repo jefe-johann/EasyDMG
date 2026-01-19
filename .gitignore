@@ -101,6 +101,9 @@ Temporary Items
 # Local debug documentation and deprecated docs
 *.md
 !README.md
+!LICENSE
+!CLA.md
+!COMMERCIAL-LICENSE.md
 Deprecated_Docs/
 
 # Sensitive build configuration
