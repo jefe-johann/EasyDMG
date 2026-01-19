@@ -7,9 +7,9 @@ Automate DMG installation on macOS. Double-click a DMG file, and EasyDMG handles
 - **Zero-click installation**: Set EasyDMG as your default DMG handler and forget about it
 - **Smart automation**: Automatically detects .app files and copies them to /Applications
 - **Flexible feedback**: Choose between progress window, notifications, or silent mode
+- **Save disk space**: Optionally moves DMGs to Trash after successful installation. No more old DMGs sitting in your downloads folder!
+- **Simple only**: If EasyDMG encounters anything unusual (license agreements, multiple apps, pkg installers), it opens the DMG and lets you handle it manually. It only automates the simple, common case.
 - **Safety first**: Prompts for confirmation when apps already exist
-- **Clean cleanup**: Optionally moves DMGs to Trash after successful installation
-- **Quarantine removal**: Strips quarantine attributes to prevent false update prompts
 - **Automatic updates**: Built-in Sparkle integration for seamless updates
 
 ## Installation
@@ -30,22 +30,24 @@ Now all DMG files will automatically install when opened.
 - macOS 10.15 (Catalina) or later
 - Notarized and code-signed for security
 
-## Philosophy
-
-**"When in doubt, go manual."** If EasyDMG encounters anything unusual (license agreements, multiple apps, pkg installers), it opens the DMG and lets you handle it manually. It only automates the simple, common case.
-
 ## Distribution
 
 EasyDMG is distributed as a **notarized, code-signed app** outside the App Store. This allows full functionality without sandbox restrictions while maintaining macOS security requirements.
 
-### Why Not App Store?
+### Why Can't I Download From The App Store?
 
-The App Sandbox prohibits:
+Apps in the App Store are sandboxed, which prohibits:
 - Mounting disk images
 - Writing to /Applications
 - Accessing files outside the sandbox
 
 These are core to EasyDMG's functionality, making App Store distribution incompatible.
+
+## Known Limitations
+
+EasyDMG follows a "when in doubt, go manual" philosophy. For unusual DMG configurations (license agreements, multiple apps, pkg installers), it opens the DMG for manual installation rather than risking incorrect automation.
+
+Some edge cases are documented and being tested - see [EDGE_CASES.md](EDGE_CASES.md) for detailed technical documentation including resolved and outstanding issues.
 
 ## Building from Source
 
@@ -90,7 +92,8 @@ Contributions welcome! Please note:
 
 1. By contributing, you agree to the [Contributor License Agreement (CLA)](CLA.md)
 2. All contributions will be dual-licensed under GPL-3.0 and commercial licenses
-3. Open an issue to discuss proposed changes before submitting large PRs
+3. Review [EDGE_CASES.md](EDGE_CASES.md) for known issues and testing priorities
+4. Open an issue to discuss proposed changes before submitting large PRs
 
 ## Support
 
