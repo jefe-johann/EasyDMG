@@ -28,6 +28,9 @@ xcuserdata/
 *.dSYM.zip
 *.dSYM
 
+## Distribution artifacts
+*.dmg
+
 ## Playgrounds
 timeline.xctimeline
 playground.xcworkspace
