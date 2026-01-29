@@ -16,6 +16,13 @@ class DMGProcessor: ObservableObject {
     @Published var isProcessing = false
     private var currentFeedbackMode: FeedbackMode = .progressBar
 
+    // Progressive messages shown at intervals if operation takes too long
+    private let magicMessages: [(delay: UInt64, message: String)] = [
+        (4_000_000_000, "🪄 Invoking ancient hamster magic..."),
+        (8_000_000_000, "Opening a high capacity portal 🎩..."),
+        (12_000_000_000, "🐹 Hamster is strong, but app is big...")
+    ]
+
     private func showProgress(_ message: String, progress: Double) {
         print("📝 \(message) (\(Int(progress * 100))%)")
 
@@ -23,6 +30,72 @@ class DMGProcessor: ObservableObject {
         if currentFeedbackMode == .progressBar {
             ProgressWindowController.shared.update(message: message, progress: progress)
         }
+    }
+
+    /// Runs a potentially slow operation with progressive fallback messages if it takes too long.
+    /// Shows different messages at 4s, 8s, and 12s intervals to indicate the app is still working.
+    private func withMagicFallback<T: Sendable>(
+        message: String,
+        progress: Double,
+        operation: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        showProgress(message, progress: progress)
+
+        // Run the operation on a background thread so timers can fire
+        let operationTask = Task.detached(priority: .userInitiated) {
+            try operation()
+        }
+
+        // Start timer tasks for each progressive message
+        let timerTasks = magicMessages.map { delayNanos, magicMsg in
+            Task { @MainActor [currentFeedbackMode] in
+                try await Task.sleep(nanoseconds: delayNanos)
+                if !Task.isCancelled && currentFeedbackMode == .progressBar {
+                    ProgressWindowController.shared.update(message: magicMsg, progress: progress)
+                    print("📝 \(magicMsg) (\(Int(progress * 100))%)")
+                }
+            }
+        }
+
+        // Wait for operation to complete, then cancel all timers
+        do {
+            let result = try await operationTask.value
+            timerTasks.forEach { $0.cancel() }
+            return result
+        } catch {
+            timerTasks.forEach { $0.cancel() }
+            throw error
+        }
+    }
+
+    /// Non-throwing version for operations that don't throw
+    private func withMagicFallback<T: Sendable>(
+        message: String,
+        progress: Double,
+        operation: @escaping @Sendable () -> T
+    ) async -> T {
+        showProgress(message, progress: progress)
+
+        // Run the operation on a background thread so timers can fire
+        let operationTask = Task.detached(priority: .userInitiated) {
+            operation()
+        }
+
+        // Start timer tasks for each progressive message
+        let timerTasks = magicMessages.map { delayNanos, magicMsg in
+            Task { @MainActor [currentFeedbackMode] in
+                try? await Task.sleep(nanoseconds: delayNanos)
+                if !Task.isCancelled && currentFeedbackMode == .progressBar {
+                    ProgressWindowController.shared.update(message: magicMsg, progress: progress)
+                    print("📝 \(magicMsg) (\(Int(progress * 100))%)")
+                }
+            }
+        }
+
+        // Wait for operation to complete, then cancel all timers
+        let result = await operationTask.value
+        timerTasks.forEach { $0.cancel() }
+        return result
     }
 
     private func sendNotification(title: String, message: String) async {
@@ -99,8 +172,7 @@ class DMGProcessor: ObservableObject {
         // }
 
         // Mount the DMG (Step 1: 0% → 20%)
-        showProgress("Mounting disk image...", progress: 0.0)
-        guard let mountPoint = await mountDMG(at: url.path) else {
+        guard let mountPoint = await mountDMG(at: url.path, progress: 0.0) else {
             await openForManualInstallation(dmgPath: url.path, reason: "DMG requires manual installation")
             return
         }
@@ -170,57 +242,62 @@ class DMGProcessor: ObservableObject {
     }
 
     // Mount a DMG file and return the mount point
-    private func mountDMG(at path: String) async -> String? {
+    private func mountDMG(at path: String, progress: Double) async -> String? {
         print("Mounting \(path)...")
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-        task.arguments = ["attach", path, "-nobrowse", "-readonly", "-noautoopen"]
+        return await withMagicFallback(
+            message: "Mounting disk image...",
+            progress: progress
+        ) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            task.arguments = ["attach", path, "-nobrowse", "-readonly", "-noautoopen"]
 
-        let pipe = Pipe()
-        let errorPipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = errorPipe
+            let pipe = Pipe()
+            let errorPipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = errorPipe
 
-        do {
-            try task.run()
-            task.waitUntilExit()
+            do {
+                try task.run()
+                task.waitUntilExit()
 
-            guard task.terminationStatus == 0 else {
-                print("Mount failed with status \(task.terminationStatus)")
-                return nil
-            }
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-
-            // Check for error/warning keywords
-            if output.lowercased().contains("error") ||
-               output.lowercased().contains("failed") ||
-               output.lowercased().contains("invalid") {
-                print("Unexpected mount output detected")
-                return nil
-            }
-
-            // Extract mount point from output (look for /Volumes/...)
-            let lines = output.components(separatedBy: .newlines)
-            for line in lines {
-                if let range = line.range(of: "/Volumes/") {
-                    let mountPoint = String(line[range.lowerBound...]).trimmingCharacters(in: .whitespaces)
-                    // Clean up mount point (remove any trailing content after the path)
-                    if let endIndex = mountPoint.firstIndex(where: { $0.isNewline || $0 == "\t" }) {
-                        return String(mountPoint[..<endIndex])
-                    }
-                    return mountPoint
+                guard task.terminationStatus == 0 else {
+                    print("Mount failed with status \(task.terminationStatus)")
+                    return nil
                 }
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+
+                // Check for error/warning keywords
+                if output.lowercased().contains("error") ||
+                   output.lowercased().contains("failed") ||
+                   output.lowercased().contains("invalid") {
+                    print("Unexpected mount output detected")
+                    return nil
+                }
+
+                // Extract mount point from output (look for /Volumes/...)
+                let lines = output.components(separatedBy: .newlines)
+                for line in lines {
+                    if let range = line.range(of: "/Volumes/") {
+                        let mountPoint = String(line[range.lowerBound...]).trimmingCharacters(in: .whitespaces)
+                        // Clean up mount point (remove any trailing content after the path)
+                        if let endIndex = mountPoint.firstIndex(where: { $0.isNewline || $0 == "\t" }) {
+                            return String(mountPoint[..<endIndex])
+                        }
+                        return mountPoint
+                    }
+                }
+
+                print("Failed to determine mount point from output")
+                return nil
+
+            } catch {
+                print("Error mounting DMG: \(error)")
+                return nil
             }
-
-            print("Failed to determine mount point from output")
-            return nil
-
-        } catch {
-            print("Error mounting DMG: \(error)")
-            return nil
         }
     }
 
@@ -357,9 +434,13 @@ class DMGProcessor: ObservableObject {
         }
 
         // Copy app to /Applications (Step 2: 20% → 40%)
-        showProgress("Installing to Applications...", progress: 0.2)
         do {
-            try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
+            try await withMagicFallback(
+                message: "Installing to Applications...",
+                progress: 0.2
+            ) {
+                try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
+            }
 
             // Remove quarantine attributes to prevent false "needs update" states
             // This replicates the behavior of manual Finder drag-and-drop installation
@@ -371,7 +452,7 @@ class DMGProcessor: ObservableObject {
             }
         } catch {
             await handleError("Installation failed")
-            await unmountDMG(at: mountPoint)
+            await unmountDMG(at: mountPoint, progress: 0.6)
             isProcessing = false
             return
         }
@@ -385,8 +466,7 @@ class DMGProcessor: ObservableObject {
         }
 
         // Unmount DMG (Step 4: 60% → 80%)
-        showProgress("Cleaning up...", progress: 0.6)
-        await unmountDMG(at: mountPoint)
+        await unmountDMG(at: mountPoint, progress: 0.6)
 
         // Move to Trash (Step 5: 80% → 100%)
         if UserPreferences.shared.autoTrashDMG {
@@ -443,9 +523,25 @@ class DMGProcessor: ObservableObject {
     }
 
     // Unmount DMG
-    private func unmountDMG(at mountPoint: String) async {
+    private func unmountDMG(at mountPoint: String, progress: Double? = nil) async {
         print("Unmounting \(mountPoint)...")
 
+        // If progress is provided, use magic fallback wrapper
+        if let progress = progress {
+            await withMagicFallback(
+                message: "Cleaning up...",
+                progress: progress
+            ) {
+                self.performUnmount(at: mountPoint)
+            }
+        } else {
+            // No progress tracking needed (error recovery paths)
+            performUnmount(at: mountPoint)
+        }
+    }
+
+    // Synchronous unmount helper (called from withMagicFallback or directly)
+    private nonisolated func performUnmount(at mountPoint: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
         task.arguments = ["detach", mountPoint]
@@ -470,7 +566,7 @@ class DMGProcessor: ObservableObject {
             // Check for "resource busy" and retry once
             if errorOutput.lowercased().contains("resource busy") {
                 print("Resource busy, waiting 250ms and retrying...")
-                try? await Task.sleep(nanoseconds: 250_000_000)
+                Thread.sleep(forTimeInterval: 0.25)
 
                 let retryTask = Process()
                 retryTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
