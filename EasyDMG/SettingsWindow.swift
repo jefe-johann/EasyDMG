@@ -282,39 +282,58 @@ class UserPreferences: ObservableObject {
     }
 }
 
-// MARK: - Sparkle Updates View
+// MARK: - Sparkle Updates View Model
+
+final class CheckForUpdatesViewModel: ObservableObject {
+    @Published var canCheckForUpdates = false
+    @Published var automaticallyChecksForUpdates = true
+
+    private let updater: SPUUpdater
+
+    init(updater: SPUUpdater) {
+        self.updater = updater
+
+        // Observe canCheckForUpdates reactively
+        updater.publisher(for: \.canCheckForUpdates)
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$canCheckForUpdates)
+
+        // Observe automaticallyChecksForUpdates reactively
+        updater.publisher(for: \.automaticallyChecksForUpdates)
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$automaticallyChecksForUpdates)
+    }
+
+    func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
+    func setAutomaticallyChecks(_ value: Bool) {
+        updater.automaticallyChecksForUpdates = value
+    }
+}
 
 struct CheckForUpdatesView: View {
-    @State private var canCheckForUpdates = false
-    @State private var automaticallyChecks = true
+    @EnvironmentObject var viewModel: CheckForUpdatesViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Button("Check for Updates...") {
-                    guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-                    appDelegate.updater.checkForUpdates()
+                    viewModel.checkForUpdates()
                 }
-                .disabled(!canCheckForUpdates)
+                .disabled(!viewModel.canCheckForUpdates)
 
                 Spacer()
             }
 
             Toggle("Automatically check for updates", isOn: Binding(
-                get: { automaticallyChecks },
+                get: { viewModel.automaticallyChecksForUpdates },
                 set: { newValue in
-                    automaticallyChecks = newValue
-                    if let appDelegate = NSApp.delegate as? AppDelegate {
-                        appDelegate.updater.automaticallyChecksForUpdates = newValue
-                    }
+                    viewModel.setAutomaticallyChecks(newValue)
                 }
             ))
             .toggleStyle(.checkbox)
-        }
-        .onAppear {
-            guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-            canCheckForUpdates = appDelegate.updater.canCheckForUpdates
-            automaticallyChecks = appDelegate.updater.automaticallyChecksForUpdates
         }
     }
 }

@@ -19,6 +19,7 @@ struct EasyDMGApp: App {
         // Settings window - shown when launched directly
         WindowGroup("EasyDMG") {
             SettingsView()
+                .environmentObject(appDelegate.updaterViewModel)
         }
         .windowResizability(.contentSize)
         .commands {
@@ -38,9 +39,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     // Update check interval (24 hours)
     private let updateCheckInterval: TimeInterval = 24 * 60 * 60
 
+    // View model for Sparkle updates UI
+    let updaterViewModel: CheckForUpdatesViewModel
+
     override init() {
-        // Initialize Sparkle updater (but don't start checking yet)
-        updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+        // Initialize Sparkle updater (start it so canCheckForUpdates works)
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        updaterViewModel = CheckForUpdatesViewModel(updater: updaterController.updater)
         super.init()
     }
 
