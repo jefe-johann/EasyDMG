@@ -33,16 +33,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     private let dmgProcessor = DMGProcessor()
     private var launchedWithFiles = false
     private let updaterController: SPUStandardUpdaterController
+    private var isWaitingForUpdateCheck = false
+
+    // Update check interval (24 hours)
+    private let updateCheckInterval: TimeInterval = 24 * 60 * 60
 
     override init() {
-        // Initialize Sparkle updater
-        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        // Initialize Sparkle updater (but don't start checking yet)
+        updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
         super.init()
     }
 
     // Expose updater for settings UI
     var updater: SPUUpdater {
         updaterController.updater
+    }
+
+    // MARK: - Update Check Timing
+
+    private var lastUpdateCheck: Date? {
+        get {
+            UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "lastUpdateCheck")
+        }
+    }
+
+    private func shouldCheckForUpdates() -> Bool {
+        guard let lastCheck = lastUpdateCheck else {
+            // Never checked before
+            return true
+        }
+
+        let timeSinceLastCheck = Date().timeIntervalSince(lastCheck)
+        return timeSinceLastCheck >= updateCheckInterval
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -75,11 +100,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
                 print("✅ Launched directly - showing settings window")
                 NSApp.setActivationPolicy(.regular)
                 NSApp.activate(ignoringOtherApps: true)
+
+                // Always check for updates when settings window is opened
+                print("✅ Checking for updates (settings window)")
+                self.updater.checkForUpdatesInBackground()
+                self.lastUpdateCheck = Date()
             } else {
                 // Launched with DMG - stay in background
                 print("✅ Launched with DMG - staying in background")
                 NSApp.setActivationPolicy(.accessory)
                 self.hideSettingsWindow()
+
+                // Only check for updates if 24+ hours have passed
+                if self.shouldCheckForUpdates() {
+                    print("✅ Checking for updates (24+ hours since last check)")
+                    self.isWaitingForUpdateCheck = true
+                    self.updater.checkForUpdatesInBackground()
+                    self.lastUpdateCheck = Date()
+
+                    // Give the update check time to complete before allowing quit
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                        print("✅ Update check timeout reached, allowing quit")
+                        self.isWaitingForUpdateCheck = false
+                    }
+                } else {
+                    print("ℹ️ Skipping update check (checked recently)")
+                }
             }
         }
     }
@@ -113,11 +159,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // Prevent quit only while actively processing
+        // Prevent quit while actively processing
         if dmgProcessor.isProcessing {
             print("⚠️ Still processing, preventing quit")
             return .terminateCancel
         }
+
+        // Prevent quit while waiting for update check to complete
+        if isWaitingForUpdateCheck {
+            print("⚠️ Waiting for update check, preventing quit")
+            return .terminateCancel
+        }
+
         print("✅ Allowing termination")
         return .terminateNow
     }
