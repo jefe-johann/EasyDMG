@@ -145,16 +145,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         // Stay in background mode when processing DMG
         NSApp.setActivationPolicy(.accessory)
 
-        for url in urls {
+        let dmgURLs = urls.filter { url in
             print("✅ Checking file: \(url.path)")
             if url.pathExtension.lowercased() == "dmg" {
-                print("✅ Processing DMG file: \(url.lastPathComponent)")
-                Task { @MainActor in
-                    await dmgProcessor.processDMG(at: url)
-                }
+                print("✅ Queueing DMG file: \(url.lastPathComponent)")
+                return true
             } else {
                 print("⚠️ Not a DMG file, ignoring: \(url.path)")
+                return false
             }
+        }
+
+        Task { @MainActor in
+            await dmgProcessor.enqueueDMGs(dmgURLs)
         }
     }
 

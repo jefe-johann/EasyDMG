@@ -15,6 +15,8 @@ import UserNotifications
 class DMGProcessor: ObservableObject {
     @Published var isProcessing = false
     private var currentFeedbackMode: FeedbackMode = .progressBar
+    private var pendingDMGURLs: [URL] = []
+    private var isDrainingQueue = false
 
     // Progressive messages shown at intervals if operation takes too long
     private let magicMessages: [(delay: UInt64, message: String)] = [
@@ -139,13 +141,42 @@ class DMGProcessor: ObservableObject {
         return userMode
     }
 
-    // Process a DMG file (main entry point)
-    func processDMG(at url: URL) async {
-        guard !isProcessing else {
+    func enqueueDMGs(_ urls: [URL]) async {
+        guard !urls.isEmpty else {
             return
         }
 
+        pendingDMGURLs.append(contentsOf: urls)
+        await drainQueueIfNeeded()
+    }
+
+    private func drainQueueIfNeeded() async {
+        guard !isDrainingQueue else {
+            return
+        }
+
+        isDrainingQueue = true
         isProcessing = true
+
+        while !pendingDMGURLs.isEmpty {
+            let nextURL = pendingDMGURLs.removeFirst()
+            await processNextDMG(at: nextURL)
+        }
+
+        isProcessing = false
+        isDrainingQueue = false
+        ProgressWindowController.shared.hide()
+
+        print("✅ Processing queue complete, quitting app")
+        NSApp.terminate(nil)
+    }
+
+    // Process a DMG file (main entry point)
+    func processDMG(at url: URL) async {
+        await enqueueDMGs([url])
+    }
+
+    private func processNextDMG(at url: URL) async {
 
         // Request notification permissions early (before checking effective mode)
         await requestNotificationPermissionsIfNeeded()
@@ -156,6 +187,8 @@ class DMGProcessor: ObservableObject {
         // Show progress window only in progress bar mode
         if currentFeedbackMode == .progressBar {
             ProgressWindowController.shared.show(message: "Preparing...", progress: 0.0)
+        } else {
+            ProgressWindowController.shared.hide()
         }
 
         // Validate the DMG file exists
@@ -213,7 +246,6 @@ class DMGProcessor: ObservableObject {
             return
         }
 
-        isProcessing = false
     }
 
     // Check if DMG has a license agreement
@@ -356,6 +388,36 @@ class DMGProcessor: ObservableObject {
         return nil  // All checks passed
     }
 
+    private func stagedAppURL(for appName: String) -> URL {
+        let stagedName = ".easydmg-\(UUID().uuidString)-\(appName)"
+        return URL(fileURLWithPath: "/Applications").appendingPathComponent(stagedName)
+    }
+
+    private func cleanupStagedAppIfNeeded(at url: URL) {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return
+        }
+
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            print("Warning: Failed to clean up staged app: \(error)")
+        }
+    }
+
+    private func trashDMGIfNeeded(at dmgPath: String, shouldTrash: Bool) {
+        guard shouldTrash else {
+            return
+        }
+
+        let dmgURL = URL(fileURLWithPath: dmgPath)
+        do {
+            try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
+        } catch {
+            print("Warning: Failed to move DMG to trash: \(error)")
+        }
+    }
+
     // Find .app files in a directory (root level only)
     private func findAppFiles(in mountPoint: String) -> [String] {
         let fileManager = FileManager.default
@@ -380,13 +442,15 @@ class DMGProcessor: ObservableObject {
     // Install an app to /Applications
     private func installApp(from appPath: String, mountPoint: String, dmgPath: String) async {
         let appName = (appPath as NSString).lastPathComponent
-        let destinationPath = "/Applications/\(appName)"
+        let destinationURL = URL(fileURLWithPath: "/Applications/\(appName)")
+        let destinationPath = destinationURL.path
+        let stagedURL = stagedAppURL(for: appName)
+        var shouldReplaceExistingApp = false
 
         // Validate /Applications folder first
         if let errorMessage = validateApplicationsFolder() {
             await handleError(errorMessage)
             await unmountDMG(at: mountPoint)
-            isProcessing = false
             return
         }
 
@@ -398,27 +462,20 @@ class DMGProcessor: ObservableObject {
             if !shouldReplace {
                 // User chose to skip
                 print("Installation cancelled by user")
-                await unmountAndCleanup(mountPoint: mountPoint, dmgPath: dmgPath)
+                await unmountAndCleanup(
+                    mountPoint: mountPoint,
+                    dmgPath: dmgPath,
+                    shouldTrashDMG: UserPreferences.shared.autoTrashDMG
+                )
                 ProgressWindowController.shared.hide()
-                isProcessing = false
-
-                // Quit after user skips
-                print("✅ User skipped installation, quitting app")
-                NSApp.terminate(nil)
                 return
             }
+
+            shouldReplaceExistingApp = true
 
             // User chose to replace - show progress if in progress bar mode
             if currentFeedbackMode == .progressBar {
-                ProgressWindowController.shared.show(message: "Removing old version...", progress: 0.2)
-            }
-            do {
-                try FileManager.default.removeItem(atPath: destinationPath)
-            } catch {
-                await handleError("Failed to remove old version")
-                await unmountDMG(at: mountPoint)
-                isProcessing = false
-                return
+                ProgressWindowController.shared.show(message: "Preparing replacement...", progress: 0.2)
             }
         }
 
@@ -429,31 +486,44 @@ class DMGProcessor: ObservableObject {
             let sizeInGB = Double(appSize) / (1024 * 1024 * 1024)
             await handleError("Insufficient disk space (need \(String(format: "%.1f", sizeInGB))GB)")
             await unmountDMG(at: mountPoint)
-            isProcessing = false
             return
         }
 
-        // Copy app to /Applications (Step 2: 20% → 40%)
+        cleanupStagedAppIfNeeded(at: stagedURL)
+
+        // Copy app to /Applications staging location (Step 2: 20% → 40%)
         do {
             try await withMagicFallback(
                 message: "Installing to Applications...",
                 progress: 0.2
             ) {
-                try FileManager.default.copyItem(atPath: appPath, toPath: destinationPath)
+                try FileManager.default.copyItem(atPath: appPath, toPath: stagedURL.path)
             }
 
             // Remove quarantine attributes to prevent false "needs update" states
             // This replicates the behavior of manual Finder drag-and-drop installation
-            await removeQuarantineAttributes(from: destinationPath)
+            await removeQuarantineAttributes(from: stagedURL.path)
+
+            if shouldReplaceExistingApp && FileManager.default.fileExists(atPath: destinationPath) {
+                showProgress("Replacing existing app...", progress: 0.3)
+                _ = try FileManager.default.replaceItemAt(
+                    destinationURL,
+                    withItemAt: stagedURL,
+                    backupItemName: nil,
+                    options: [.usingNewMetadataOnly]
+                )
+            } else {
+                try FileManager.default.moveItem(at: stagedURL, to: destinationURL)
+            }
 
             // Send notification if in notification mode
             if currentFeedbackMode == .notification {
                 await sendNotification(title: "EasyDMG", message: "\(appName) installed successfully")
             }
         } catch {
+            cleanupStagedAppIfNeeded(at: stagedURL)
             await handleError("Installation failed")
             await unmountDMG(at: mountPoint, progress: 0.6)
-            isProcessing = false
             return
         }
 
@@ -471,12 +541,7 @@ class DMGProcessor: ObservableObject {
         // Move to Trash (Step 5: 80% → 100%)
         if UserPreferences.shared.autoTrashDMG {
             showProgress("Moving disk image to trash...", progress: 0.8)
-            let dmgURL = URL(fileURLWithPath: dmgPath)
-            do {
-                try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
-            } catch {
-                print("Warning: Failed to move DMG to trash: \(error)")
-            }
+            trashDMGIfNeeded(at: dmgPath, shouldTrash: true)
         } else {
             showProgress("Keeping disk image...", progress: 0.8)
         }
@@ -490,12 +555,7 @@ class DMGProcessor: ObservableObject {
 
         // Hide the progress window (only visible in progress bar mode)
         ProgressWindowController.shared.hide()
-        isProcessing = false
-
-        // Quit the app after processing is complete
-        // Note: Notifications use 1-second trigger, so they'll deliver after app quits
-        print("✅ Processing complete, quitting app")
-        NSApp.terminate(nil)
+        print("✅ Processing complete for \(appName)")
     }
 
     // Show Skip/Replace dialog
@@ -593,17 +653,17 @@ class DMGProcessor: ObservableObject {
         }
     }
 
-    // Unmount and cleanup (move DMG to trash)
-    private func unmountAndCleanup(mountPoint: String, dmgPath: String) async {
+    // Unmount and cleanup (optionally move DMG to trash)
+    private func unmountAndCleanup(mountPoint: String, dmgPath: String, shouldTrashDMG: Bool) async {
         await unmountDMG(at: mountPoint)
 
-        // Move DMG to trash
-        let dmgURL = URL(fileURLWithPath: dmgPath)
-        do {
-            try FileManager.default.trashItem(at: dmgURL, resultingItemURL: nil)
-        } catch {
-            print("Warning: Failed to move DMG to trash: \(error)")
+        if shouldTrashDMG {
+            showProgress("Moving disk image to trash...", progress: 0.8)
+        } else {
+            showProgress("Keeping disk image...", progress: 0.8)
         }
+
+        trashDMGIfNeeded(at: dmgPath, shouldTrash: shouldTrashDMG)
     }
 
     // Remove quarantine attributes from installed app
@@ -641,22 +701,24 @@ class DMGProcessor: ObservableObject {
     private func openForManualInstallation(mountPoint: String) async {
         NSWorkspace.shared.open(URL(fileURLWithPath: mountPoint))
         ProgressWindowController.shared.hide()
-        isProcessing = false
 
-        // Quit after opening for manual install
-        print("✅ Opened for manual installation, quitting app")
-        NSApp.terminate(nil)
+        print("✅ Opened mounted volume for manual installation")
     }
 
     // Open for manual installation (DMG path)
     private func openForManualInstallation(dmgPath: String, reason: String) async {
-        NSWorkspace.shared.open(URL(fileURLWithPath: dmgPath))
-        ProgressWindowController.shared.hide()
-        isProcessing = false
+        let dmgURL = URL(fileURLWithPath: dmgPath)
+        let mounterURL = URL(fileURLWithPath: "/System/Library/CoreServices/DiskImageMounter.app")
+        let configuration = NSWorkspace.OpenConfiguration()
 
-        // Quit after opening for manual install
-        print("✅ Opened for manual installation, quitting app")
-        NSApp.terminate(nil)
+        NSWorkspace.shared.open([dmgURL], withApplicationAt: mounterURL, configuration: configuration) { _, error in
+            if let error {
+                print("❌ Failed to open DMG in DiskImageMounter (\(reason)): \(error)")
+            }
+        }
+        ProgressWindowController.shared.hide()
+
+        print("✅ Opened DMG in DiskImageMounter for manual installation: \(reason)")
     }
 
     // Reveal app in Finder
@@ -672,10 +734,7 @@ class DMGProcessor: ObservableObject {
         // Keep error visible for 3 seconds
         try? await Task.sleep(nanoseconds: 3_000_000_000)
         ProgressWindowController.shared.hide()
-        isProcessing = false
 
-        // Quit after error
-        print("✅ Error handled, quitting app")
-        NSApp.terminate(nil)
+        print("✅ Error handled, continuing queue if needed")
     }
 }
