@@ -115,3 +115,7 @@ Contributions welcome! Please note:
 ## Support
 
 Found a bug? Have a feature request? [Open an issue](https://github.com/jefe-johann/EasyDMG/issues).
+
+## Privacy
+
+EasyDMG's privacy policy is available in [PRIVACY.md](PRIVACY.md).
