@@ -119,3 +119,6 @@ AGENTS.md
 release_guide.md
 
 gemini.md
+
+# VS Code Local History extension
+.history/

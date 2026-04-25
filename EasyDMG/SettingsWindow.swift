@@ -87,12 +87,8 @@ struct SetupTabView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Right click any DMG and select 'Open With' to have EasyDMG seamlessly handle installation and cleanup.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(theme.muted)
-                    .lineSpacing(2)
 
-                // Set as Default card
+                // Set as Default section
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Set as Default")
                         .font(.system(size: 12.5, weight: .bold))
@@ -118,12 +114,10 @@ struct SetupTabView: View {
                         .buttonStyle(AmberFilledButtonStyle())
                     }
                 }
-                .padding(EdgeInsets(top: 13, leading: 15, bottom: 13, trailing: 15))
-                .background(theme.surface, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(theme.border, lineWidth: 1)
-                )
+
+                Rectangle()
+                    .fill(theme.border)
+                    .frame(height: 1)
 
                 // Manual setup steps
                 VStack(alignment: .leading, spacing: 9) {
@@ -149,6 +143,22 @@ struct SetupTabView: View {
                         Spacer()
                     }
                     .padding(.top, 8)
+                }
+
+                Rectangle()
+                    .fill(theme.border)
+                    .frame(height: 1)
+
+                // Open With section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Open with EasyDMG Without Setting as Default")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(theme.text)
+
+                    Text("Right click any DMG and select 'Open With' to have EasyDMG seamlessly handle installation and cleanup.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(theme.muted)
+                        .lineSpacing(2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
