@@ -22,19 +22,24 @@ enum SettingsTab: String, CaseIterable {
 // MARK: - Window Configurator
 
 private struct WindowConfigurator: NSViewRepresentable {
+    let backgroundColor: NSColor
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            window.styleMask.insert(.fullSizeContentView)
             window.isMovableByWindowBackground = true
+            window.backgroundColor = backgroundColor
             repositionTrafficLights(in: window, targetX: 16)
         }
         return view
     }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            nsView.window?.backgroundColor = backgroundColor
+        }
+    }
 
     private func repositionTrafficLights(in window: NSWindow, targetX: CGFloat) {
         let types: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
@@ -81,10 +86,11 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 550, height: 500)
+        .frame(minWidth: 550, idealWidth: 550, maxWidth: .infinity,
+               minHeight: 500, idealHeight: 500, maxHeight: .infinity)
         .background(theme.background)
-        .background(WindowConfigurator())
-        .ignoresSafeArea(.all, edges: .top)
+        .background(WindowConfigurator(backgroundColor: NSColor(theme.background)))
+        .ignoresSafeArea()
     }
 }
 
