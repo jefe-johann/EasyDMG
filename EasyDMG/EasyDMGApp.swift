@@ -22,7 +22,8 @@ struct EasyDMGApp: App {
                 .environmentObject(appDelegate.updaterViewModel)
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
+        .defaultSize(width: 550, height: 500)
+        .windowResizability(.contentMinSize)
         .commands {
             // Remove file menu commands
             CommandGroup(replacing: .newItem) { }
