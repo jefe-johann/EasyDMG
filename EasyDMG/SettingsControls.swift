@@ -94,8 +94,9 @@ struct SettingsTabBar: View {
                             }
                             Text(tab.rawValue)
                         }
+                        .modifier(NavSegmentStyle(isSelected: selection == tab, muted: theme.muted))
                     }
-                    .buttonStyle(NavSegmentStyle(isSelected: selection == tab, muted: theme.muted))
+                    .buttonStyle(.plain)
                 }
             }
             .padding(3)
@@ -114,22 +115,12 @@ struct SettingsTabBar: View {
     }
 }
 
-private struct NavSegmentStyle: ButtonStyle {
-    let isSelected: Bool
-    let muted: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        NavSegmentContent(configuration: configuration, isSelected: isSelected, muted: muted)
-    }
-}
-
-private struct NavSegmentContent: View {
-    let configuration: ButtonStyle.Configuration
+private struct NavSegmentStyle: ViewModifier {
     let isSelected: Bool
     let muted: Color
     @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
+    func body(content: Content) -> some View {
         let darkActiveFill = Color(hex: "1F140E")
         let darkOutline = SettingsPalette.sand.opacity(0.55)
         let fill: Color = isSelected
@@ -139,21 +130,21 @@ private struct NavSegmentContent: View {
             ? (colorScheme == .dark ? darkOutline : SettingsPalette.navy)
             : .clear
 
-        return configuration.label
+        return content
             .font(.system(size: 12, weight: .bold))
             .foregroundStyle(isSelected ? (colorScheme == .dark ? Color.white : SettingsPalette.navy) : muted)
             .padding(.vertical, 4)
             .padding(.horizontal, 12)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(fill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(stroke, lineWidth: 1.5)
-                    )
-                    .animation(.easeInOut(duration: 0.14), value: isSelected)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(stroke, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .animation(.easeInOut(duration: 0.14), value: isSelected)
     }
 }
 
