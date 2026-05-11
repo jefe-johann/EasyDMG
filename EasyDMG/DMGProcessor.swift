@@ -10,6 +10,7 @@ import Foundation
 import AppKit
 import Combine
 import UserNotifications
+import Darwin
 
 fileprivate extension String {
     /// Strips a trailing `.app` for display in user-facing copy.
@@ -351,6 +352,7 @@ class DMGProcessor: ObservableObject {
         case clean
         case retrySuccess
         case forceSuccess
+        case timedOut(stage: String)
         case failed(exitStatus: Int32?)
 
         var supportValue: String {
@@ -361,6 +363,8 @@ class DMGProcessor: ObservableObject {
                 return "retry_success"
             case .forceSuccess:
                 return "force_success"
+            case .timedOut:
+                return "timed_out"
             case .failed:
                 return "failed"
             }
@@ -370,8 +374,19 @@ class DMGProcessor: ObservableObject {
             switch self {
             case .clean, .retrySuccess, .forceSuccess:
                 return 0
+            case .timedOut:
+                return nil
             case let .failed(status):
                 return status
+            }
+        }
+
+        var timedOutStage: String? {
+            switch self {
+            case let .timedOut(stage):
+                return stage
+            case .clean, .retrySuccess, .forceSuccess, .failed:
+                return nil
             }
         }
     }
@@ -386,6 +401,12 @@ class DMGProcessor: ObservableObject {
     private struct ParsedAppVersion {
         let components: [Int]
         let prerelease: String?
+    }
+
+    private struct ProcessRunResult: Sendable {
+        let exitStatus: Int32?
+        let standardError: String
+        let timedOut: Bool
     }
 
     private enum ApplicationsFolderIssue: String {
@@ -2094,29 +2115,81 @@ class DMGProcessor: ObservableObject {
         if let exitStatus = result.exitStatus {
             details["exit_status"] = String(exitStatus)
         }
+        if let timedOutStage = result.timedOutStage {
+            details["timed_out_stage"] = timedOutStage
+        }
         support(event: "unmount_result", details: details)
         return result
     }
 
-    private nonisolated func performUnmount(at mountPoint: String) -> UnmountResult {
+    private nonisolated func runProcessWithTimeout(
+        executableURL: URL,
+        arguments: [String],
+        timeout: TimeInterval
+    ) throws -> ProcessRunResult {
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-        task.arguments = ["detach", mountPoint]
+        task.executableURL = executableURL
+        task.arguments = arguments
 
         let errorPipe = Pipe()
         task.standardError = errorPipe
 
-        do {
-            try task.run()
-            task.waitUntilExit()
+        let semaphore = DispatchSemaphore(value: 0)
+        task.terminationHandler = { _ in
+            semaphore.signal()
+        }
 
-            if task.terminationStatus == 0 {
+        try task.run()
+
+        var timedOut = false
+        if semaphore.wait(timeout: .now() + timeout) == .timedOut {
+            timedOut = true
+            DiagnosticLogger.shared.diagnostic(
+                "Process timed out after \(timeout)s: \(executableURL.path) \(arguments.joined(separator: " "))"
+            )
+
+            let processIdentifier = task.processIdentifier
+            task.terminate()
+            if semaphore.wait(timeout: .now() + 2.0) == .timedOut {
+                kill(processIdentifier, SIGKILL)
+                _ = semaphore.wait(timeout: .now() + 1.0)
+            }
+        }
+
+        let errorOutput: String
+        if task.isRunning {
+            errorOutput = ""
+        } else {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+        }
+
+        return ProcessRunResult(
+            exitStatus: task.isRunning ? nil : task.terminationStatus,
+            standardError: errorOutput,
+            timedOut: timedOut
+        )
+    }
+
+    private nonisolated func performUnmount(at mountPoint: String) -> UnmountResult {
+        do {
+            let hdiutilURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            let cleanResult = try runProcessWithTimeout(
+                executableURL: hdiutilURL,
+                arguments: ["detach", mountPoint],
+                timeout: 8.0
+            )
+
+            if cleanResult.exitStatus == 0 {
                 DiagnosticLogger.shared.diagnostic("✓ Clean detach succeeded")
                 return .clean
             }
 
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            if cleanResult.timedOut {
+                DiagnosticLogger.shared.diagnostic("Clean detach timed out")
+            }
+
+            let errorOutput = cleanResult.standardError
             DiagnosticLogger.shared.diagnostic(
                 "Detach failed: \(DiagnosticLogger.compact(errorOutput))"
             )
@@ -2125,33 +2198,42 @@ class DMGProcessor: ObservableObject {
                 DiagnosticLogger.shared.diagnostic("Resource busy, waiting 250ms and retrying...")
                 Thread.sleep(forTimeInterval: 0.25)
 
-                let retryTask = Process()
-                retryTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-                retryTask.arguments = ["detach", mountPoint]
-                try? retryTask.run()
-                retryTask.waitUntilExit()
+                let retryResult = try runProcessWithTimeout(
+                    executableURL: hdiutilURL,
+                    arguments: ["detach", mountPoint],
+                    timeout: 8.0
+                )
 
-                if retryTask.terminationStatus == 0 {
+                if retryResult.exitStatus == 0 {
                     DiagnosticLogger.shared.diagnostic("✓ Retry detach succeeded")
                     return .retrySuccess
+                }
+
+                if retryResult.timedOut {
+                    DiagnosticLogger.shared.diagnostic("Retry detach timed out")
                 }
             }
 
             DiagnosticLogger.shared.diagnostic("Using force detach...")
-            let forceTask = Process()
-            forceTask.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-            forceTask.arguments = ["detach", mountPoint, "-force"]
-            try? forceTask.run()
-            forceTask.waitUntilExit()
-            if forceTask.terminationStatus == 0 {
+            let forceResult = try runProcessWithTimeout(
+                executableURL: hdiutilURL,
+                arguments: ["detach", mountPoint, "-force"],
+                timeout: 8.0
+            )
+            if forceResult.exitStatus == 0 {
                 DiagnosticLogger.shared.diagnostic("✓ Force detach completed with status 0")
                 return .forceSuccess
             }
 
+            if forceResult.timedOut {
+                DiagnosticLogger.shared.diagnostic("Force detach timed out")
+                return .timedOut(stage: "force_detach")
+            }
+
             DiagnosticLogger.shared.diagnostic(
-                "Force detach failed with status \(forceTask.terminationStatus)"
+                "Force detach failed with status \(forceResult.exitStatus.map { String($0) } ?? "unknown")"
             )
-            return .failed(exitStatus: forceTask.terminationStatus)
+            return .failed(exitStatus: forceResult.exitStatus)
         } catch {
             DiagnosticLogger.shared.diagnostic("Error unmounting DMG: \(error)")
             return .failed(exitStatus: nil)

@@ -32,6 +32,10 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 
+	<!-- Launch without a Dock icon unless the app explicitly enters regular mode -->
+	<key>LSUIElement</key>
+	<true/>
+
 	<!-- Privacy - Desktop Folder Usage (informational only, not enforced outside App Store) -->
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>EasyDMG needs access to install applications to your Applications folder.</string>
